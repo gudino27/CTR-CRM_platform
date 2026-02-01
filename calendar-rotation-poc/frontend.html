@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar Rotation POC</title>
+  <link rel="stylesheet" href="/calendar-rotation-poc/frontend.css">
+</head>
+<body>
+  <div class="card">
+    <h1>Calendar Rotation POC</h1>
+    <p>Automated weekly rotation with Google Calendar</p>
+    <button class="btn" onclick="location.href='/auth/google'">Connect Google</button>
+    <button class="btn btn-success" onclick="refresh()">Refresh</button>
+  </div>
+
+  <div class="card">
+    <h2>Connected Users (<span id="userCount">0</span>)</h2>
+    <div class="grid" id="users"></div>
+  </div>
+
+  <div class="card">
+    <h2>Groups (<span id="groupCount">0</span>)</h2>
+    <div class="grid" id="groups"></div>
+  </div>
+
+  <div class="card">
+    <h2>Calendar View</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <button class="btn" onclick="changeMonth(-1)" style="padding: 8px 15px;">← Prev</button>
+      <h3 id="calendarMonth" style="margin: 0;"></h3>
+      <button class="btn" onclick="changeMonth(1)" style="padding: 8px 15px;">Next →</button>
+    </div>
+    <div id="calendar" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Rotations</h2>
+    <div id="rotations"></div>
+  </div>
+  <script src="/calendar-rotation-poc/frontend.js"></script>    
+</body>
+</html>
