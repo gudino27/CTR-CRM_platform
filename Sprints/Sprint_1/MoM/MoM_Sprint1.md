@@ -26,21 +26,26 @@ The new CRM platform will focus on operational tracking rather than replacing ex
 Rocket.Chat will continue to be used for communication, including cancellations and substitutions. 
 Google Calendar will continue to be used for scheduling. 
 Database design will be the first implementation task, using Baserow. 
+The CRM will act as the structured data layer that connects scheduling, volunteers, seniors, and feedback into one centralized system.
 4. Action Items / Responsibilities
-Task: Design initial database schema in Baserow| Assigned To: _____________________ | Deadline: _____________________ | Priority: ___
+Task: Design initial database schema in Baserow| Assigned To: Alice Hui | Deadline: Sprint 1 or 2| Priority: High
+Task: Draft high-level system architecture showing WordPress to N8N to Baserow to Calendar flow| Assigned To: Jaime Gudino | Deadline: Sprint 1 or 2 | Priority: Medium
+Task: Identify core entities (Vounteer, Senior, Meeting, Feedback, Exceptions)| Assigned To: Team | Deadline: Sprint 1 | Priority: High
 5. Client Feedback / Clarifications
 The current biggest challenge is managing cancellations and substitutions for recurring meetings with multiple volunteers.
 Feedback form processes are still flexible and will be refined later in the project.
+The client emphasized that the CRM should improve administrative visibility without disrupting the current workflow. 
+Maintainability and simplicity are important priorities.
 6. Linkage to Deliverables (optional)
-Relevant Requirement Document Section(s): ________________________
-Impact on Sprint / Milestone: ________________________
-Presentation / Report Updates Needed: ________________________
+Relevant Requirement Document Section(s): Database schema design, Backend system integration, Dashboard/visualization, Calendar integration planning
+Impact on Sprint / Milestone: This meeting defined the system scope and clarified that Sprint 1 should focus on database modeling and architectural validation before building full features. 
+Presentation / Report Updates Needed: Update Spring 1 report to reflect confirmed architecutre direction and database-first implementation strategy.
 7. Next Steps & Follow-Up
 Deliverables before next meeting: draft database tables and relationships in Baserow
 Next meeting scheduled on: TBD
 Agreed communication channel: Email
-Prepared By: __________________________
-Date of Circulation: __________________________
+Prepared By: Alice Hui
+Date of Circulation: 01/30/2026
 
 
 
