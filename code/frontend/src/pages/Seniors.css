@@ -1,0 +1,273 @@
+.list-toolbar {
+  margin-bottom: 1rem;
+  max-width: 400px;
+}
+
+.page-header--row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.page-new-btn {
+  padding: 0.5rem 1rem;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+.page-new-btn:hover {
+  background: var(--teal-dark);
+}
+
+.senior-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--warm-gray);
+}
+
+.detail-row:last-of-type {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-availability {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-avail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.detail-avail-day {
+  font-weight: 500;
+}
+
+.detail-notes {
+  font-size: 0.9rem;
+  color: var(--navy);
+  line-height: 1.5;
+  background: var(--warm-gray);
+  padding: 0.625rem;
+  border-radius: 6px;
+}
+
+.detail-none {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.detail-group-chip {
+  display: inline-block;
+  background: var(--teal-ghost);
+  color: var(--teal-dark);
+  border: 1px solid rgba(43,143,138,0.25);
+  border-radius: 6px;
+  padding: 0.3rem 0.625rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+/* Edit trigger button (view mode) */
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.detail-edit-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--navy);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.detail-edit-trigger:hover {
+  background: var(--warm-gray);
+  border-color: var(--teal);
+}
+
+/* Edit form (shared by Seniors and Volunteers) */
+.detail-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-row--avail {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-row--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-row--full {
+  flex-direction: column;
+}
+
+.form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-label--day {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--navy);
+  background: #fff;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(43,143,138,0.12);
+}
+
+.form-select {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--navy);
+  background: #fff;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--navy);
+  background: #fff;
+  resize: vertical;
+  font-family: var(--font-body);
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.form-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.25rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--warm-gray);
+  margin-top: 0.25rem;
+}
+
+.edit-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.875rem;
+  background: var(--teal);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.12s;
+}
+
+.edit-save-btn:hover {
+  background: var(--teal-dark);
+}
+
+.edit-cancel-btn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.edit-cancel-btn:hover {
+  background: var(--warm-gray);
+}

@@ -1,0 +1,12 @@
+{
+  "name": "ctr-crm-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Setup and utility scripts for CTR-CRM Baserow tables",
+  "scripts": {
+    "setup-tables": "node createBaserowTables.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  }
+}

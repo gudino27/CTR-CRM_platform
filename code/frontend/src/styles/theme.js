@@ -1,0 +1,20 @@
+export const theme = {
+  teal:      "#2B8F8A",
+  tealLight: "#3FBFB9",
+  tealDark:  "#1A6B67",
+  tealGhost: "#E8F7F6",
+  gold:      "#D9923A",
+  goldLight: "#F5C579",
+  navy:      "#1B3A52",
+  cream:     "#FDF9F4",
+  warmGray:  "#F2EEE9",
+  border:    "#DDD8D2",
+  textMuted: "#7A7068",
+  green:     "#27AE60",
+  red:       "#E74C3C",
+  amber:     "#F39C12",
+  fonts: {
+    display: "'Playfair Display', serif",
+    body:    "'DM Sans', sans-serif",
+  },
+};

@@ -1,0 +1,110 @@
+:root {
+  --teal:       #2B8F8A;
+  --teal-light: #3FBFB9;
+  --teal-dark:  #1A6B67;
+  --teal-ghost: #E8F7F6;
+  --gold:       #D9923A;
+  --gold-light: #F5C579;
+  --navy:       #1B3A52;
+  --cream:      #FDF9F4;
+  --warm-gray:  #F2EEE9;
+  --border:     #DDD8D2;
+  --text-muted: #7A7068;
+  --green:      #27AE60;
+  --red:        #E74C3C;
+  --amber:      #F39C12;
+  --font-display: 'Playfair Display', serif;
+  --font-body:    'DM Sans', sans-serif;
+  --sidebar-width: 220px;
+  --topbar-height: 56px;
+  --bottom-nav-height: 60px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--navy);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-body);
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* App shell layout */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Main content area — mobile: full width, pad bottom for bottom nav */
+.main-content {
+  flex: 1;
+  padding: 1rem;
+  padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+  padding-top: calc(var(--topbar-height) + 1rem);
+  overflow-y: auto;
+}
+
+/* Desktop: shift content right of sidebar, remove bottom pad */
+@media (min-width: 768px) {
+  .main-content {
+    margin-left: var(--sidebar-width);
+    padding-bottom: 2rem;
+    padding-top: 2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Page header */
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+@media (min-width: 768px) {
+  .page-title {
+    font-size: 1.875rem;
+  }
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}

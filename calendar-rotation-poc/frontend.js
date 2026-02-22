@@ -266,6 +266,17 @@ let data = {};
       refresh();
     }
 
+    // Returns the actual visit date (YYYY-MM-DD) for a rotation based on the group's dayOfWeek.
+    // weekStartDate is always Monday; dayOfWeek 1=Mon, 2=Tue, ..., 7=Sun.
+    function getRotationDate(rotation) {
+      const group = data.groups.find(g => g.id === rotation.groupId);
+      if (!group) return null;
+      const [y, m, d] = rotation.weekStartDate.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      date.setDate(date.getDate() + (group.schedule.dayOfWeek - 1));
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
     function renderCalendar() {
       const year = currentCalendarDate.getFullYear();
       const month = currentCalendarDate.getMonth();
@@ -301,7 +312,7 @@ let data = {};
 
       for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayRotations = data.rotations.filter(r => r.weekStartDate === dateStr);
+        const dayRotations = data.rotations.filter(r => getRotationDate(r) === dateStr);
 
         const dayCell = document.createElement('div');
         dayCell.style.minHeight = '80px';

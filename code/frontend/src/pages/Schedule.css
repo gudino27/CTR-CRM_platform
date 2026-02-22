@@ -1,0 +1,52 @@
+.schedule-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.schedule-nav__btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  transition: background 0.12s;
+}
+
+.schedule-nav__btn:hover {
+  background: var(--warm-gray);
+}
+
+.schedule-nav__label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.schedule-nav__label:hover {
+  background: var(--warm-gray);
+}
+
+.schedule-chip__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.schedule-chip__time {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}

@@ -2,3 +2,8 @@ calendar-rotation-poc/node_modules
 calendar-rotation-poc/.env
 client_secret_807315055290-u891tb8kpn005abdhj6rc6po2e5icedq.apps.googleusercontent.com.json
 calendar-rotation-poc/data.json
+code/frontend/node_modules
+code/frontend/dist
+code/scripts/node_modules
+code/scripts/.env
+code/frontend/.env

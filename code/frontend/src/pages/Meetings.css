@@ -1,0 +1,30 @@
+.meetings-filters {
+  margin-bottom: 1rem;
+}
+
+.meetings-select {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--navy);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.meetings-select:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.instance-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}

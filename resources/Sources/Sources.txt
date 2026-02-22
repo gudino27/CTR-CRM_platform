@@ -1,0 +1,2 @@
+https://baserow.io/docs/apis/rest-api
+https://community.baserow.io/t/new-table-baserow-localhost-api/7930
