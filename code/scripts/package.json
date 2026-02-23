@@ -4,7 +4,10 @@
   "type": "module",
   "description": "Setup and utility scripts for CTR-CRM Baserow tables",
   "scripts": {
-    "setup-tables": "node createBaserowTables.js"
+    "setup-tables": "node createBaserowTables.js",
+    "setup-app": "node createBaserowApp.js",
+    "add-navigation": "node addNavigation.js",
+    "setup-users": "node setupAppUsers.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7"
