@@ -1,0 +1,709 @@
+{
+  "updatedAt": "2026-03-21T18:41:21.419Z",
+  "createdAt": "2026-03-18T04:05:24.872Z",
+  "id": "0bC1L4qKobLmufXr",
+  "name": "WF3 \u2014 Volunteer Feedback",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "volunteer-feedback",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "webhookId": "wf3-volunteer-feedback"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Normalize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/730/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "submitted_at",
+              "value": "={{ $json.submitted_at }}"
+            },
+            {
+              "name": "visit_date",
+              "value": "={{ $json.visit_date }}"
+            },
+            {
+              "name": "volunteer_name",
+              "value": "={{ $json.volunteer_name }}"
+            },
+            {
+              "name": "volunteer_email",
+              "value": "={{ $json.volunteer_email }}"
+            },
+            {
+              "name": "senior_name",
+              "value": "={{ $json.senior_name }}"
+            },
+            {
+              "name": "other_volunteers_on_call",
+              "value": "={{ $json.other_volunteers_on_call }}"
+            },
+            {
+              "name": "service_hours",
+              "value": "={{ $json.service_hours }}"
+            },
+            {
+              "name": "senior_time_on_call_minutes",
+              "value": "={{ $json.senior_time_on_call_minutes }}"
+            },
+            {
+              "name": "feedback",
+              "value": "={{ $json.feedback }}"
+            },
+            {
+              "name": "attending_next_week",
+              "value": "={{ $json.attending_next_week }}"
+            },
+            {
+              "name": "tech_support_other",
+              "value": "={{ $json.tech_support_other }}"
+            },
+            {
+              "name": "tech_problem_details",
+              "value": "={{ $json.tech_problem_details }}"
+            },
+            {
+              "name": "needs_help",
+              "value": "={{ $json.needs_help }}"
+            },
+            {
+              "name": "how_can_we_help",
+              "value": "={{ $json.how_can_we_help }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Create Feedback Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&filter__email__equal={{ encodeURIComponent($('Normalize Fields').item.json.volunteer_email) }}&filter__Active__boolean=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Find Volunteer PERSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true&filter__person__link_row_has={{ $json.results.length > 0 ? $json.results[0].id : 0 }}&filter__Active__boolean=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000005",
+      "name": "Find VOLUNTEER Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1136,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&search={{ encodeURIComponent($('Normalize Fields').item.json.senior_name) }}&filter__Active__boolean=true&order_by=-id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000006",
+      "name": "Find Senior PERSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1360,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true&filter__person__link_row_has={{ $json.results.length > 0 ? $json.results[0].id : 0 }}&filter__Active__boolean=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000007",
+      "name": "Find SENIOR Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1584,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/730/{{ $('Create Feedback Row').item.json.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "volunteer",
+              "value": "={{ $('Find VOLUNTEER Record').item.json.results?.length > 0 ? [{ id: $('Find VOLUNTEER Record').item.json.results[0].id }] : [] }}"
+            },
+            {
+              "name": "senior",
+              "value": "={{ $json.results?.length > 0 ? [{ id: $json.results[0].id }] : [] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000008",
+      "name": "Link Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1808,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Fields": {
+      "main": [
+        [
+          {
+            "node": "Create Feedback Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Feedback Row": {
+      "main": [
+        [
+          {
+            "node": "Find Volunteer PERSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Volunteer PERSON": {
+      "main": [
+        [
+          {
+            "node": "Find VOLUNTEER Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find VOLUNTEER Record": {
+      "main": [
+        [
+          {
+            "node": "Find Senior PERSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Senior PERSON": {
+      "main": [
+        [
+          {
+            "node": "Find SENIOR Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find SENIOR Record": {
+      "main": [
+        [
+          {
+            "node": "Link Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "40c67ae4-b874-4260-9ed3-fb0bc330fa3a",
+  "activeVersionId": "40c67ae4-b874-4260-9ed3-fb0bc330fa3a",
+  "versionCounter": 9,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-18T04:05:24.874Z",
+      "createdAt": "2026-03-18T04:05:24.874Z",
+      "role": "workflow:owner",
+      "workflowId": "0bC1L4qKobLmufXr",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:41:22.000Z",
+    "createdAt": "2026-03-21T18:41:21.419Z",
+    "versionId": "40c67ae4-b874-4260-9ed3-fb0bc330fa3a",
+    "workflowId": "0bC1L4qKobLmufXr",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "volunteer-feedback",
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000001",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          304
+        ],
+        "webhookId": "wf3-volunteer-feedback"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000002",
+        "name": "Normalize Fields",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3,
+        "position": [
+          464,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/730/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "submitted_at",
+                "value": "={{ $json.submitted_at }}"
+              },
+              {
+                "name": "visit_date",
+                "value": "={{ $json.visit_date }}"
+              },
+              {
+                "name": "volunteer_name",
+                "value": "={{ $json.volunteer_name }}"
+              },
+              {
+                "name": "volunteer_email",
+                "value": "={{ $json.volunteer_email }}"
+              },
+              {
+                "name": "senior_name",
+                "value": "={{ $json.senior_name }}"
+              },
+              {
+                "name": "other_volunteers_on_call",
+                "value": "={{ $json.other_volunteers_on_call }}"
+              },
+              {
+                "name": "service_hours",
+                "value": "={{ $json.service_hours }}"
+              },
+              {
+                "name": "senior_time_on_call_minutes",
+                "value": "={{ $json.senior_time_on_call_minutes }}"
+              },
+              {
+                "name": "feedback",
+                "value": "={{ $json.feedback }}"
+              },
+              {
+                "name": "attending_next_week",
+                "value": "={{ $json.attending_next_week }}"
+              },
+              {
+                "name": "tech_support_other",
+                "value": "={{ $json.tech_support_other }}"
+              },
+              {
+                "name": "tech_problem_details",
+                "value": "={{ $json.tech_problem_details }}"
+              },
+              {
+                "name": "needs_help",
+                "value": "={{ $json.needs_help }}"
+              },
+              {
+                "name": "how_can_we_help",
+                "value": "={{ $json.how_can_we_help }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000003",
+        "name": "Create Feedback Row",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          688,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&filter__email__equal={{ encodeURIComponent($('Normalize Fields').item.json.volunteer_email) }}&filter__Active__boolean=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000004",
+        "name": "Find Volunteer PERSON",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          912,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true&filter__person__link_row_has={{ $json.results.length > 0 ? $json.results[0].id : 0 }}&filter__Active__boolean=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000005",
+        "name": "Find VOLUNTEER Record",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1136,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&search={{ encodeURIComponent($('Normalize Fields').item.json.senior_name) }}&filter__Active__boolean=true&order_by=-id",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000006",
+        "name": "Find Senior PERSON",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1360,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true&filter__person__link_row_has={{ $json.results.length > 0 ? $json.results[0].id : 0 }}&filter__Active__boolean=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000007",
+        "name": "Find SENIOR Record",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1584,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/730/{{ $('Create Feedback Row').item.json.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "volunteer",
+                "value": "={{ $('Find VOLUNTEER Record').item.json.results?.length > 0 ? [{ id: $('Find VOLUNTEER Record').item.json.results[0].id }] : [] }}"
+              },
+              {
+                "name": "senior",
+                "value": "={{ $json.results?.length > 0 ? [{ id: $json.results[0].id }] : [] }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a1b2c3d4-0001-0001-0001-000000000008",
+        "name": "Link Records",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1808,
+          304
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Fields",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Fields": {
+        "main": [
+          [
+            {
+              "node": "Create Feedback Row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Feedback Row": {
+        "main": [
+          [
+            {
+              "node": "Find Volunteer PERSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Volunteer PERSON": {
+        "main": [
+          [
+            {
+              "node": "Find VOLUNTEER Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find VOLUNTEER Record": {
+        "main": [
+          [
+            {
+              "node": "Find Senior PERSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Senior PERSON": {
+        "main": [
+          [
+            {
+              "node": "Find SENIOR Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find SENIOR Record": {
+        "main": [
+          [
+            {
+              "node": "Link Records",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version 40c67ae4",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:41:22.611Z",
+        "id": 195,
+        "workflowId": "0bC1L4qKobLmufXr",
+        "versionId": "40c67ae4-b874-4260-9ed3-fb0bc330fa3a",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

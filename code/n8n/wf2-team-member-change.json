@@ -1,0 +1,949 @@
+{
+  "updatedAt": "2026-03-21T20:10:43.310Z",
+  "createdAt": "2026-03-21T18:41:33.474Z",
+  "id": "QsVT96p4uNzkHEUA",
+  "name": "WF2 \u2014 Team Member Change",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf2-team-member-change",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ],
+      "id": "34bf3e31-eff8-42af-9c5e-2d77b81aa1ca",
+      "webhookId": "9ed1d6f1-da44-4c13-a9ec-7945fb8ad652"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst items = body.items || [];\nconst oldItems = body.old_items || [];\n\nconst item = items[0] || {};\nconst oldItem = oldItems[0] || {};\n\nconst teamMemberId = item.id;\nconst teamId = (item.team || [])[0]?.id;\nconst newEndDate = item.end_date || '';\nconst oldEndDate = oldItem.end_date || '';\n\nreturn [{ json: { teamMemberId, teamId, newEndDate, oldEndDate } }];"
+      },
+      "name": "Parse Change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "id": "d1d1037d-6ace-4294-8306-0ced09e8724b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.newEndDate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "End Date Just Set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        304
+      ],
+      "id": "ab57f6ff-7947-4fbc-a4a9-502e3c5882cc"
+    },
+    {
+      "parameters": {},
+      "name": "Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        528
+      ],
+      "id": "5aa8f96f-d4c7-41ab-a578-c2835cadf005"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/{{ $json.teamId }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        720,
+        304
+      ],
+      "id": "11badf40-f616-4038-a18f-629ca761cbb9"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/{{ $json.senior[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Senior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        960,
+        304
+      ],
+      "id": "9e9e5e95-aac7-45f8-917c-f19679854251"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/554/{{ $json.senior_community[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Community",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1200,
+        304
+      ],
+      "id": "3dce5d4c-82ef-4be0-99b6-5bde97a47400"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&filter__team__link_row_has={{ $('Parse Change').item.json.teamId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1440,
+        304
+      ],
+      "id": "77aea85d-2454-402e-ba2a-cefc80471e21"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.results[0].google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com') }}/events/{{ $json.results[0].calendar_event_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "name": "Delete Old Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        304
+      ],
+      "id": "905cc291-4319-4ded-9a6b-901f8ea8180f",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filter__team__link_row_has={{ $('Parse Change').item.json.teamId }}&filter__end_date__empty=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Active Members",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1920,
+        304
+      ],
+      "id": "38869bf2-612a-4180-ba3a-1274b772d24b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const team      = $('Get Team').item.json;\nconst calendarId = team.google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com';\nconst senior    = $('Get Senior').item.json;\nconst community = $('Get Community').item.json;\nconst members   = $input.first().json.results || [];\nconst meetingRow = $('Get Meeting').item.json.results?.[0] || {};\nconst meetingId  = meetingRow.id;\n\nconst dayToIndex = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:0 };\nconst dayToRrule = { Monday:'MO', Tuesday:'TU', Wednesday:'WE', Thursday:'TH', Friday:'FR', Saturday:'SA', Sunday:'SU' };\n\nconst dayOfWeek  = team.call_day_of_week?.value || 'Monday';\nconst callTime   = team.call_time || '14:00:00';\nconst timezone   = community.timezone?.value || 'America/New_York';\n\nconst [hours, minutes] = callTime.split(':').map(Number);\n\nconst now = new Date();\nconst targetDay = dayToIndex[dayOfWeek];\nconst currentDay = now.getDay();\nlet daysUntil = (targetDay - currentDay + 7) % 7;\nif (daysUntil === 0) daysUntil = 7;\n\nconst nextDate = new Date(now);\nnextDate.setDate(now.getDate() + daysUntil);\n\nconst pad = n => String(n).padStart(2, '0');\nconst dateStr  = `${nextDate.getFullYear()}-${pad(nextDate.getMonth()+1)}-${pad(nextDate.getDate())}`;\nconst startDT  = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;\nconst endDT    = `${dateStr}T${pad(hours + 1)}:${pad(minutes)}:00`;\n\nconst seniorName    = senior.display_name?.[0]?.value || senior.Name || 'Senior';\nconst communityName = community.Name || community.name || 'Community';\n\nconst volunteers = members.map(m => ({\n  name:  m.volunteer_display_name?.[0]?.value || '',\n  email: m.volunteer_email?.[0]?.value || null\n})).filter(v => v.name);\n\nconst volunteerNames = volunteers.map(v => v.name).join(', ');\nconst attendees = volunteers\n  .filter(v => v.email)\n  .map(v => ({ email: v.email, displayName: v.name, responseStatus: 'needsAction' }));\n\nconst description = [\n  'Weekly CTR Virtual Visit',\n  '',\n  `Senior: ${seniorName}`,\n  `Community: ${communityName}`,\n  volunteerNames ? `Volunteer Group: ${volunteerNames}` : '',\n  '',\n  'Join the conversation: https://chat.conversationstoremember.org',\n  '',\n  'Schedule changes must go through the CTR admin portal.'\n].filter(l => l !== undefined).join('\\n');\n\nreturn [{ json: {\n  calendarId,\n  meetingId,\n  summary:       `CTR Visit: ${seniorName}`,\n  description,\n  startDateTime: startDT,\n  endDateTime:   endDT,\n  timezone,\n  rrule:         `RRULE:FREQ=WEEKLY;BYDAY=${dayToRrule[dayOfWeek]}`,\n  attendees,\n  hasAttendees:  attendees.length > 0\n}}];"
+      },
+      "name": "Build Event Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        304
+      ],
+      "id": "f61f4e6f-252c-418c-a9b1-7063ef7f67a4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendarId) }}/events?sendUpdates=none",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": {{ JSON.stringify($json.summary) }},\n  \"description\": {{ JSON.stringify($json.description) }},\n  \"start\": {\n    \"dateTime\": {{ JSON.stringify($json.startDateTime) }},\n    \"timeZone\": {{ JSON.stringify($json.timezone) }}\n  },\n  \"end\": {\n    \"dateTime\": {{ JSON.stringify($json.endDateTime) }},\n    \"timeZone\": {{ JSON.stringify($json.timezone) }}\n  },\n  \"recurrence\": [ {{ JSON.stringify($json.rrule) }} ],\n  \"attendees\": {{ JSON.stringify($json.attendees) }},\n  \"reminders\": { \"useDefault\": true }\n}",
+        "options": {}
+      },
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2400,
+        304
+      ],
+      "id": "db9bbd2e-66a6-4ac1-bf7f-06feadf0d0f6",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $('Build Event Data').item.json.meetingId }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"calendar_event_id\": {{ JSON.stringify($json.id) }}, \"google_calendar_id\": {{ JSON.stringify($('Build Event Data').item.json.calendarId) }}}",
+        "options": {}
+      },
+      "name": "Save Event ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2640,
+        304
+      ],
+      "id": "3530a525-8c9a-475c-95e2-83f976b686a0"
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "=CTR: Team roster updated \u2014 calendar rebuilt",
+        "options": {}
+      },
+      "name": "Notify Director",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        304
+      ],
+      "id": "c63ed0c9-4d13-4f8d-b73c-6bddea2219f3",
+      "webhookId": "57d36d49-3a4c-431e-889d-126b59612bd4",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Change": {
+      "main": [
+        [
+          {
+            "node": "End Date Just Set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "End Date Just Set?": {
+      "main": [
+        [
+          {
+            "node": "Get Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Team": {
+      "main": [
+        [
+          {
+            "node": "Get Senior",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Senior": {
+      "main": [
+        [
+          {
+            "node": "Get Community",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Community": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Event": {
+      "main": [
+        [
+          {
+            "node": "Get Active Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Members": {
+      "main": [
+        [
+          {
+            "node": "Build Event Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Event Data": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Save Event ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Event ID": {
+      "main": [
+        [
+          {
+            "node": "Notify Director",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "22672424-9f12-407a-a446-ba9ac74b738b",
+  "activeVersionId": "22672424-9f12-407a-a446-ba9ac74b738b",
+  "versionCounter": 22,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T18:41:33.477Z",
+      "createdAt": "2026-03-21T18:41:33.477Z",
+      "role": "workflow:owner",
+      "workflowId": "QsVT96p4uNzkHEUA",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T20:10:43.311Z",
+    "createdAt": "2026-03-21T20:10:43.311Z",
+    "versionId": "22672424-9f12-407a-a446-ba9ac74b738b",
+    "workflowId": "QsVT96p4uNzkHEUA",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf2-team-member-change",
+          "responseMode": "onReceived",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          304
+        ],
+        "id": "34bf3e31-eff8-42af-9c5e-2d77b81aa1ca",
+        "webhookId": "9ed1d6f1-da44-4c13-a9ec-7945fb8ad652"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst items = body.items || [];\nconst oldItems = body.old_items || [];\n\nconst item = items[0] || {};\nconst oldItem = oldItems[0] || {};\n\nconst teamMemberId = item.id;\nconst teamId = (item.team || [])[0]?.id;\nconst newEndDate = item.end_date || '';\nconst oldEndDate = oldItem.end_date || '';\n\nreturn [{ json: { teamMemberId, teamId, newEndDate, oldEndDate } }];"
+        },
+        "name": "Parse Change",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          304
+        ],
+        "id": "d1d1037d-6ace-4294-8306-0ced09e8724b"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "cond1",
+                "leftValue": "={{ $json.newEndDate }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "name": "End Date Just Set?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          480,
+          304
+        ],
+        "id": "ab57f6ff-7947-4fbc-a4a9-502e3c5882cc"
+      },
+      {
+        "parameters": {},
+        "name": "Skip",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          480,
+          528
+        ],
+        "id": "5aa8f96f-d4c7-41ab-a578-c2835cadf005"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/{{ $json.teamId }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Team",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          720,
+          304
+        ],
+        "id": "11badf40-f616-4038-a18f-629ca761cbb9"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/{{ $json.senior[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Senior",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          960,
+          304
+        ],
+        "id": "9e9e5e95-aac7-45f8-917c-f19679854251"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/554/{{ $json.senior_community[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Community",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1200,
+          304
+        ],
+        "id": "3dce5d4c-82ef-4be0-99b6-5bde97a47400"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&filter__team__link_row_has={{ $('Parse Change').item.json.teamId }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Meeting",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1440,
+          304
+        ],
+        "id": "77aea85d-2454-402e-ba2a-cefc80471e21"
+      },
+      {
+        "parameters": {
+          "method": "DELETE",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.results[0].google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com') }}/events/{{ $json.results[0].calendar_event_id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "name": "Delete Old Event",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1680,
+          304
+        ],
+        "id": "905cc291-4319-4ded-9a6b-901f8ea8180f",
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filter__team__link_row_has={{ $('Parse Change').item.json.teamId }}&filter__end_date__empty=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Active Members",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1920,
+          304
+        ],
+        "id": "38869bf2-612a-4180-ba3a-1274b772d24b"
+      },
+      {
+        "parameters": {
+          "jsCode": "const team      = $('Get Team').item.json;\nconst calendarId = team.google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com';\nconst senior    = $('Get Senior').item.json;\nconst community = $('Get Community').item.json;\nconst members   = $input.first().json.results || [];\nconst meetingRow = $('Get Meeting').item.json.results?.[0] || {};\nconst meetingId  = meetingRow.id;\n\nconst dayToIndex = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:0 };\nconst dayToRrule = { Monday:'MO', Tuesday:'TU', Wednesday:'WE', Thursday:'TH', Friday:'FR', Saturday:'SA', Sunday:'SU' };\n\nconst dayOfWeek  = team.call_day_of_week?.value || 'Monday';\nconst callTime   = team.call_time || '14:00:00';\nconst timezone   = community.timezone?.value || 'America/New_York';\n\nconst [hours, minutes] = callTime.split(':').map(Number);\n\nconst now = new Date();\nconst targetDay = dayToIndex[dayOfWeek];\nconst currentDay = now.getDay();\nlet daysUntil = (targetDay - currentDay + 7) % 7;\nif (daysUntil === 0) daysUntil = 7;\n\nconst nextDate = new Date(now);\nnextDate.setDate(now.getDate() + daysUntil);\n\nconst pad = n => String(n).padStart(2, '0');\nconst dateStr  = `${nextDate.getFullYear()}-${pad(nextDate.getMonth()+1)}-${pad(nextDate.getDate())}`;\nconst startDT  = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;\nconst endDT    = `${dateStr}T${pad(hours + 1)}:${pad(minutes)}:00`;\n\nconst seniorName    = senior.display_name?.[0]?.value || senior.Name || 'Senior';\nconst communityName = community.Name || community.name || 'Community';\n\nconst volunteers = members.map(m => ({\n  name:  m.volunteer_display_name?.[0]?.value || '',\n  email: m.volunteer_email?.[0]?.value || null\n})).filter(v => v.name);\n\nconst volunteerNames = volunteers.map(v => v.name).join(', ');\nconst attendees = volunteers\n  .filter(v => v.email)\n  .map(v => ({ email: v.email, displayName: v.name, responseStatus: 'needsAction' }));\n\nconst description = [\n  'Weekly CTR Virtual Visit',\n  '',\n  `Senior: ${seniorName}`,\n  `Community: ${communityName}`,\n  volunteerNames ? `Volunteer Group: ${volunteerNames}` : '',\n  '',\n  'Join the conversation: https://chat.conversationstoremember.org',\n  '',\n  'Schedule changes must go through the CTR admin portal.'\n].filter(l => l !== undefined).join('\\n');\n\nreturn [{ json: {\n  calendarId,\n  meetingId,\n  summary:       `CTR Visit: ${seniorName}`,\n  description,\n  startDateTime: startDT,\n  endDateTime:   endDT,\n  timezone,\n  rrule:         `RRULE:FREQ=WEEKLY;BYDAY=${dayToRrule[dayOfWeek]}`,\n  attendees,\n  hasAttendees:  attendees.length > 0\n}}];"
+        },
+        "name": "Build Event Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2160,
+          304
+        ],
+        "id": "f61f4e6f-252c-418c-a9b1-7063ef7f67a4"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendarId) }}/events?sendUpdates=none",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"summary\": {{ JSON.stringify($json.summary) }},\n  \"description\": {{ JSON.stringify($json.description) }},\n  \"start\": {\n    \"dateTime\": {{ JSON.stringify($json.startDateTime) }},\n    \"timeZone\": {{ JSON.stringify($json.timezone) }}\n  },\n  \"end\": {\n    \"dateTime\": {{ JSON.stringify($json.endDateTime) }},\n    \"timeZone\": {{ JSON.stringify($json.timezone) }}\n  },\n  \"recurrence\": [ {{ JSON.stringify($json.rrule) }} ],\n  \"attendees\": {{ JSON.stringify($json.attendees) }},\n  \"reminders\": { \"useDefault\": true }\n}",
+          "options": {}
+        },
+        "name": "Create Calendar Event",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          2400,
+          304
+        ],
+        "id": "db9bbd2e-66a6-4ac1-bf7f-06feadf0d0f6",
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $('Build Event Data').item.json.meetingId }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"calendar_event_id\": {{ JSON.stringify($json.id) }}, \"google_calendar_id\": {{ JSON.stringify($('Build Event Data').item.json.calendarId) }}}",
+          "options": {}
+        },
+        "name": "Save Event ID",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          2640,
+          304
+        ],
+        "id": "3530a525-8c9a-475c-95e2-83f976b686a0"
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "=CTR: Team roster updated \u2014 calendar rebuilt",
+          "options": {}
+        },
+        "name": "Notify Director",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          2880,
+          304
+        ],
+        "id": "c63ed0c9-4d13-4f8d-b73c-6bddea2219f3",
+        "webhookId": "57d36d49-3a4c-431e-889d-126b59612bd4",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Parse Change",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Change": {
+        "main": [
+          [
+            {
+              "node": "End Date Just Set?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "End Date Just Set?": {
+        "main": [
+          [
+            {
+              "node": "Get Team",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Team": {
+        "main": [
+          [
+            {
+              "node": "Get Senior",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Senior": {
+        "main": [
+          [
+            {
+              "node": "Get Community",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Community": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting": {
+        "main": [
+          [
+            {
+              "node": "Delete Old Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Old Event": {
+        "main": [
+          [
+            {
+              "node": "Get Active Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Members": {
+        "main": [
+          [
+            {
+              "node": "Build Event Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Event Data": {
+        "main": [
+          [
+            {
+              "node": "Create Calendar Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Calendar Event": {
+        "main": [
+          [
+            {
+              "node": "Save Event ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Event ID": {
+        "main": [
+          [
+            {
+              "node": "Notify Director",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T20:10:43.348Z",
+        "id": 238,
+        "workflowId": "QsVT96p4uNzkHEUA",
+        "versionId": "22672424-9f12-407a-a446-ba9ac74b738b",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

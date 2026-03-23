@@ -1,0 +1,367 @@
+{
+  "updatedAt": "2026-03-21T18:27:14.623Z",
+  "createdAt": "2026-03-20T20:52:24.183Z",
+  "id": "b8U4e8Yq5xWZgAPq",
+  "name": "WF-Hub Spoke: Provision Team Calendars",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "provision-team-calendars",
+        "options": {}
+      },
+      "id": "hs-01",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ],
+      "webhookId": "36eee43e-888d-40aa-b534-7927d51177b3"
+    },
+    {
+      "parameters": {
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/563/?user_field_names=true&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "hs-02",
+      "name": "Get All Teams",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const teams = $input.first().json.results;\nconst needsCalendar = teams.filter(t => !t.google_calendar_id);\nconsole.log(`Teams total: ${teams.length}, need calendar: ${needsCalendar.length}`);\nreturn needsCalendar.map(t => ({\n  json: {\n    team_id: t.id,\n    team_name: Array.isArray(t.team_name) ? (t.team_name[0]?.value || `Team ${t.id}`) : (t.team_name || `Team ${t.id}`),\n    calendar_summary: `CTR: ${Array.isArray(t.team_name) ? (t.team_name[0]?.value || `Team ${t.id}`) : (t.team_name || `Team ${t.id}`)}`\n  }\n}));"
+      },
+      "id": "hs-03",
+      "name": "Filter Teams Without Calendar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"summary\": {{ JSON.stringify($json.calendar_summary) }}, \"description\": \"Volunteer team calendar - Conversations to Remember\", \"timeZone\": \"America/Los_Angeles\"}",
+        "options": {}
+      },
+      "id": "hs-04",
+      "name": "Create Google Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        672,
+        304
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/{{ $('Filter Teams Without Calendar').item.json.team_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"google_calendar_id\": \"{{ $json.id }}\"}",
+        "options": {}
+      },
+      "id": "hs-05",
+      "name": "Save Calendar ID to Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        896,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Get All Teams": {
+      "main": [
+        [
+          {
+            "node": "Filter Teams Without Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Teams Without Calendar": {
+      "main": [
+        [
+          {
+            "node": "Create Google Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Save Calendar ID to Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get All Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b57bb566-93cf-418d-9d7a-2e90acad0472",
+  "activeVersionId": "b57bb566-93cf-418d-9d7a-2e90acad0472",
+  "versionCounter": 13,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-20T20:52:24.184Z",
+      "createdAt": "2026-03-20T20:52:24.184Z",
+      "role": "workflow:owner",
+      "workflowId": "b8U4e8Yq5xWZgAPq",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:27:16.000Z",
+    "createdAt": "2026-03-21T18:27:14.624Z",
+    "versionId": "b57bb566-93cf-418d-9d7a-2e90acad0472",
+    "workflowId": "b8U4e8Yq5xWZgAPq",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "provision-team-calendars",
+          "options": {}
+        },
+        "id": "hs-01",
+        "name": "Webhook Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          304
+        ],
+        "webhookId": "36eee43e-888d-40aa-b534-7927d51177b3"
+      },
+      {
+        "parameters": {
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/563/?user_field_names=true&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "hs-02",
+        "name": "Get All Teams",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          224,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const teams = $input.first().json.results;\nconst needsCalendar = teams.filter(t => !t.google_calendar_id);\nconsole.log(`Teams total: ${teams.length}, need calendar: ${needsCalendar.length}`);\nreturn needsCalendar.map(t => ({\n  json: {\n    team_id: t.id,\n    team_name: Array.isArray(t.team_name) ? (t.team_name[0]?.value || `Team ${t.id}`) : (t.team_name || `Team ${t.id}`),\n    calendar_summary: `CTR: ${Array.isArray(t.team_name) ? (t.team_name[0]?.value || `Team ${t.id}`) : (t.team_name || `Team ${t.id}`)}`\n  }\n}));"
+        },
+        "id": "hs-03",
+        "name": "Filter Teams Without Calendar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          448,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://www.googleapis.com/calendar/v3/calendars",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"summary\": {{ JSON.stringify($json.calendar_summary) }}, \"description\": \"Volunteer team calendar - Conversations to Remember\", \"timeZone\": \"America/Los_Angeles\"}",
+          "options": {}
+        },
+        "id": "hs-04",
+        "name": "Create Google Calendar",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          672,
+          304
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/{{ $('Filter Teams Without Calendar').item.json.team_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"google_calendar_id\": \"{{ $json.id }}\"}",
+          "options": {}
+        },
+        "id": "hs-05",
+        "name": "Save Calendar ID to Team",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          896,
+          304
+        ]
+      }
+    ],
+    "connections": {
+      "Get All Teams": {
+        "main": [
+          [
+            {
+              "node": "Filter Teams Without Calendar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Teams Without Calendar": {
+        "main": [
+          [
+            {
+              "node": "Create Google Calendar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Google Calendar": {
+        "main": [
+          [
+            {
+              "node": "Save Calendar ID to Team",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get All Teams",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version b57bb566",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:27:16.008Z",
+        "id": 187,
+        "workflowId": "b8U4e8Yq5xWZgAPq",
+        "versionId": "b57bb566-93cf-418d-9d7a-2e90acad0472",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

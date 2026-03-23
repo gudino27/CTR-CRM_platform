@@ -1,0 +1,1054 @@
+{
+  "updatedAt": "2026-03-21T18:29:02.247Z",
+  "createdAt": "2026-03-21T06:58:21.042Z",
+  "id": "59tDFMWT7ofZeyy2",
+  "name": "WF3 \u2014 Instance Cancellation (Cancel Calendar Occurrence)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf3-cancel-instance",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ],
+      "webhookId": "wf3-cancel-instance-001",
+      "id": "4b9bda0f-a0eb-4f62-a4f5-58957bcd42a5"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $json.body.instance_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        304
+      ],
+      "id": "63d747f9-c76f-4278-b16c-f1aa73d8c034"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inst = $input.first().json;\nconst meetingArr = inst.meeting || [];\nconst meetingId = meetingArr[0]?.id;\nconst instDate = (inst.instance_date || '').split('T')[0];\nreturn [{ json: {\n  instance_id: inst.id,\n  meeting_id: meetingId,\n  instance_date: instDate,\n  instance_start: inst.instance_start || '',\n}}];\n"
+      },
+      "name": "Extract Instance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        304
+      ],
+      "id": "a90013cf-1af6-44f8-b0a3-d4ca608fa537"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        608,
+        304
+      ],
+      "id": "be7b3974-a83b-48b8-acf6-cb34e7bf7610"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting').item.json.google_calendar_id) }}/events/{{ $('Get Meeting').item.json.calendar_event_id }}/instances",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeMin",
+              "value": "={{ $('Extract Instance').item.json.instance_date }}T00:00:00Z"
+            },
+            {
+              "name": "timeMax",
+              "value": "={{ $('Extract Instance').item.json.instance_date }}T23:59:59Z"
+            },
+            {
+              "name": "singleEvents",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api"
+      },
+      "name": "Get Calendar Occurrences",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        192
+      ],
+      "id": "e910ae43-2cda-45ba-a583-3d5796f04195",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting').item.json.google_calendar_id) }}/events/{{ ($json.items || [])[0]?.id || '' }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api"
+      },
+      "name": "Delete Occurrence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        192
+      ],
+      "id": "6bf325d9-c46e-4c37-a256-98b7dbc44742",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&size=200&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting_instance\",\"type\":\"link_row_has\",\"value\":\"{{ $('Extract Instance').item.json.instance_id }}\"},{\"field\":\"attendance_status\",\"type\":\"single_select_equal\",\"value\":\"expected\"}]}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Attendances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        432
+      ],
+      "id": "41f397d1-0d3c-40cd-a35d-2683501faadc"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst rows = ($input.first().json.results || []);\nfor (const att of rows) {\n  const volArr = att.volunteer || [];\n  for (const vol of volArr) {\n    results.push({ json: { volunteer_id: vol.id, volunteer_name: vol.value } });\n  }\n}\nreturn results;\n"
+      },
+      "name": "Split Attendees",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        432
+      ],
+      "id": "029a7cfd-91cc-4ce2-878c-3d694d896c21"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        432
+      ],
+      "id": "7bc1b91b-69a4-488f-b8b5-22ee79a8931b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst volResponses = $input.all();\nconst ctxItems = $('Split Attendees').all();\nfor (let i = 0; i < volResponses.length; i++) {\n  const vol = volResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  const personArr = vol.person || [];\n  const personId = personArr[0]?.id;\n  results.push({ json: { person_id: personId, volunteer_name: ctx.volunteer_name } });\n}\nreturn results;\n"
+      },
+      "name": "Extract Person ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        432
+      ],
+      "id": "55e5e9e0-4ccf-45c8-a675-9e485c960b32"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Person Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        432
+      ],
+      "id": "0d6ecd65-0486-4f86-af1d-a3fddf269a02"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst personResponses = $input.all();\nconst ctxItems = $('Extract Person ID').all();\nconst instanceDate = $('Extract Instance').first().json.instance_date || '';\nfor (let i = 0; i < personResponses.length; i++) {\n  const person = personResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  if (!person.email) continue;\n  results.push({ json: {\n    toEmail: person.email,\n    firstName: person.first_name || ctx.volunteer_name,\n    instanceDate: instanceDate,\n  }});\n}\nreturn results;\n"
+      },
+      "name": "Build Cancel Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        432
+      ],
+      "id": "a024646b-3f5a-44e2-8b63-d4458dc0ef43"
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $json.toEmail }}",
+        "subject": "=CTR Visit Cancelled \u2014 {{ $json.instanceDate }}",
+        "html": "=<p>Hi {{ $json.firstName }},</p><p>Your scheduled CTR visit on <strong>{{ $json.instanceDate }}</strong> has been <strong>cancelled</strong>.</p><p>If you have questions, please contact your team coordinator.</p><p>\u2014 Conversations to Remember</p>",
+        "options": {}
+      },
+      "name": "Send Cancellation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        432
+      ],
+      "id": "0f6a4983-8384-4cd9-a8c6-9b904828a575",
+      "webhookId": "44345cc3-9caa-472b-9103-3140e9256a64",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "id": "9619ac82",
+      "name": "Items Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ab433a18",
+              "leftValue": "={{ ($json.items || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cb878f6b",
+      "name": "Update Instance Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        192
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Extract Instance').item.json.instance_id }}/?user_field_names=true",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"instance_status\": \"canceled\"}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Instance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Instance": {
+      "main": [
+        [
+          {
+            "node": "Extract Instance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Instance": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Occurrences",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Attendances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Occurrences": {
+      "main": [
+        [
+          {
+            "node": "Items Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attendances": {
+      "main": [
+        [
+          {
+            "node": "Split Attendees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Attendees": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Extract Person ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Person ID": {
+      "main": [
+        [
+          {
+            "node": "Get Person Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Person Email": {
+      "main": [
+        [
+          {
+            "node": "Build Cancel Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Cancel Email": {
+      "main": [
+        [
+          {
+            "node": "Send Cancellation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Items Found?": {
+      "main": [
+        [
+          {
+            "node": "Delete Occurrence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Delete Occurrence": {
+      "main": [
+        [
+          {
+            "node": "Update Instance Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "192.168.10.95:5678",
+            "user-agent": "curl/8.7.1",
+            "accept": "*/*",
+            "content-type": "application/json",
+            "content-length": "18"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "instance_id": 3
+          },
+          "webhookUrl": "http://localhost:5678/webhook/wf3-cancel-instance",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "versionId": "e1b7109e-37b2-4f93-a7ec-69fd8b0d5b51",
+  "activeVersionId": "e1b7109e-37b2-4f93-a7ec-69fd8b0d5b51",
+  "versionCounter": 33,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T06:58:21.045Z",
+      "createdAt": "2026-03-21T06:58:21.045Z",
+      "role": "workflow:owner",
+      "workflowId": "59tDFMWT7ofZeyy2",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:29:02.248Z",
+    "createdAt": "2026-03-21T18:29:02.248Z",
+    "versionId": "e1b7109e-37b2-4f93-a7ec-69fd8b0d5b51",
+    "workflowId": "59tDFMWT7ofZeyy2",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf3-cancel-instance",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          304
+        ],
+        "webhookId": "wf3-cancel-instance-001",
+        "id": "4b9bda0f-a0eb-4f62-a4f5-58957bcd42a5"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $json.body.instance_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Instance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          208,
+          304
+        ],
+        "id": "63d747f9-c76f-4278-b16c-f1aa73d8c034"
+      },
+      {
+        "parameters": {
+          "jsCode": "const inst = $input.first().json;\nconst meetingArr = inst.meeting || [];\nconst meetingId = meetingArr[0]?.id;\nconst instDate = (inst.instance_date || '').split('T')[0];\nreturn [{ json: {\n  instance_id: inst.id,\n  meeting_id: meetingId,\n  instance_date: instDate,\n  instance_start: inst.instance_start || '',\n}}];\n"
+        },
+        "name": "Extract Instance",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          304
+        ],
+        "id": "a90013cf-1af6-44f8-b0a3-d4ca608fa537"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Meeting",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          608,
+          304
+        ],
+        "id": "be7b3974-a83b-48b8-acf6-cb34e7bf7610"
+      },
+      {
+        "parameters": {
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting').item.json.google_calendar_id) }}/events/{{ $('Get Meeting').item.json.calendar_event_id }}/instances",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "timeMin",
+                "value": "={{ $('Extract Instance').item.json.instance_date }}T00:00:00Z"
+              },
+              {
+                "name": "timeMax",
+                "value": "={{ $('Extract Instance').item.json.instance_date }}T23:59:59Z"
+              },
+              {
+                "name": "singleEvents",
+                "value": "true"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api"
+        },
+        "name": "Get Calendar Occurrences",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          800,
+          192
+        ],
+        "id": "e910ae43-2cda-45ba-a583-3d5796f04195",
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "DELETE",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting').item.json.google_calendar_id) }}/events/{{ ($json.items || [])[0]?.id || '' }}",
+          "options": {},
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api"
+        },
+        "name": "Delete Occurrence",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1200,
+          192
+        ],
+        "id": "6bf325d9-c46e-4c37-a256-98b7dbc44742",
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&size=200&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting_instance\",\"type\":\"link_row_has\",\"value\":\"{{ $('Extract Instance').item.json.instance_id }}\"},{\"field\":\"attendance_status\",\"type\":\"single_select_equal\",\"value\":\"expected\"}]}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Attendances",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          800,
+          432
+        ],
+        "id": "41f397d1-0d3c-40cd-a35d-2683501faadc"
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst rows = ($input.first().json.results || []);\nfor (const att of rows) {\n  const volArr = att.volunteer || [];\n  for (const vol of volArr) {\n    results.push({ json: { volunteer_id: vol.id, volunteer_name: vol.value } });\n  }\n}\nreturn results;\n"
+        },
+        "name": "Split Attendees",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1008,
+          432
+        ],
+        "id": "029a7cfd-91cc-4ce2-878c-3d694d896c21"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1200,
+          432
+        ],
+        "id": "7bc1b91b-69a4-488f-b8b5-22ee79a8931b"
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst volResponses = $input.all();\nconst ctxItems = $('Split Attendees').all();\nfor (let i = 0; i < volResponses.length; i++) {\n  const vol = volResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  const personArr = vol.person || [];\n  const personId = personArr[0]?.id;\n  results.push({ json: { person_id: personId, volunteer_name: ctx.volunteer_name } });\n}\nreturn results;\n"
+        },
+        "name": "Extract Person ID",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1408,
+          432
+        ],
+        "id": "55e5e9e0-4ccf-45c8-a675-9e485c960b32"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Get Person Email",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1600,
+          432
+        ],
+        "id": "0d6ecd65-0486-4f86-af1d-a3fddf269a02"
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst personResponses = $input.all();\nconst ctxItems = $('Extract Person ID').all();\nconst instanceDate = $('Extract Instance').first().json.instance_date || '';\nfor (let i = 0; i < personResponses.length; i++) {\n  const person = personResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  if (!person.email) continue;\n  results.push({ json: {\n    toEmail: person.email,\n    firstName: person.first_name || ctx.volunteer_name,\n    instanceDate: instanceDate,\n  }});\n}\nreturn results;\n"
+        },
+        "name": "Build Cancel Email",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1808,
+          432
+        ],
+        "id": "a024646b-3f5a-44e2-8b63-d4458dc0ef43"
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $json.toEmail }}",
+          "subject": "=CTR Visit Cancelled \u2014 {{ $json.instanceDate }}",
+          "html": "=<p>Hi {{ $json.firstName }},</p><p>Your scheduled CTR visit on <strong>{{ $json.instanceDate }}</strong> has been <strong>cancelled</strong>.</p><p>If you have questions, please contact your team coordinator.</p><p>\u2014 Conversations to Remember</p>",
+          "options": {}
+        },
+        "name": "Send Cancellation Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          2000,
+          432
+        ],
+        "id": "0f6a4983-8384-4cd9-a8c6-9b904828a575",
+        "webhookId": "44345cc3-9caa-472b-9103-3140e9256a64",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "id": "9619ac82",
+        "name": "Items Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1008,
+          192
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "ab433a18",
+                "leftValue": "={{ ($json.items || []).length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "cb878f6b",
+        "name": "Update Instance Status",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          192
+        ],
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Extract Instance').item.json.instance_id }}/?user_field_names=true",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"instance_status\": \"canceled\"}",
+          "options": {},
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Get Instance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Instance": {
+        "main": [
+          [
+            {
+              "node": "Extract Instance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Instance": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Occurrences",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Attendances",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Occurrences": {
+        "main": [
+          [
+            {
+              "node": "Items Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Attendances": {
+        "main": [
+          [
+            {
+              "node": "Split Attendees",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Attendees": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Extract Person ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Person ID": {
+        "main": [
+          [
+            {
+              "node": "Get Person Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Person Email": {
+        "main": [
+          [
+            {
+              "node": "Build Cancel Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Cancel Email": {
+        "main": [
+          [
+            {
+              "node": "Send Cancellation Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Items Found?": {
+        "main": [
+          [
+            {
+              "node": "Delete Occurrence",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Delete Occurrence": {
+        "main": [
+          [
+            {
+              "node": "Update Instance Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:29:02.278Z",
+        "id": 189,
+        "workflowId": "59tDFMWT7ofZeyy2",
+        "versionId": "e1b7109e-37b2-4f93-a7ec-69fd8b0d5b51",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      },
+      {
+        "createdAt": "2026-03-21T18:29:02.270Z",
+        "id": 188,
+        "workflowId": "59tDFMWT7ofZeyy2",
+        "versionId": "e1b7109e-37b2-4f93-a7ec-69fd8b0d5b51",
+        "event": "deactivated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

@@ -1,0 +1,3809 @@
+{
+  "updatedAt": "2026-03-21T18:35:48.040Z",
+  "createdAt": "2026-03-18T04:07:48.666Z",
+  "id": "ZWb7c4a4TOtLuSHL",
+  "name": "WF9 \u2014 Approval Gate",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf9-proposed-change",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000001",
+      "name": "Incoming: Proposed Change",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        928
+      ],
+      "webhookId": "wf9-proposed-change"
+    },
+    {
+      "parameters": {
+        "path": "wf9-approve",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000002",
+      "name": "Approve: Callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1632
+      ],
+      "webhookId": "wf9-approve"
+    },
+    {
+      "parameters": {
+        "path": "wf9-reject",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000003",
+      "name": "Reject: Callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1856
+      ],
+      "webhookId": "wf9-reject"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n// n8n webhook v2 puts body at .body, v1 puts it at root\nconst body = raw.body || raw;\nconst id = (body.items && body.items[0] && body.items[0].id) || null;\nif (!id) throw new Error('Cannot extract proposed_change_id from webhook payload');\nreturn [{ json: { proposed_change_id: id } }];"
+      },
+      "id": "wf9-0001-0001-0001-000000000004",
+      "name": "Parse Change ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000005",
+      "name": "Fetch Change (Incoming)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        96,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const change = $('Fetch Change (Incoming)').first().json;\nconst id = change.id;\n\nconst changeType   = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy   = change.proposed_by_email?.value ||change.proposed_by_email || 'Unknown';\nconst description  = change.description || '(no description)';\nconst notes        = change.notes || '';\nconst proposedAt   = change.proposed_at || new Date().toISOString();\n\nconst instanceRef    = change.meeting_instance?.[0]?.value || '';\nconst teamMemberRef  = change.team_member?.[0]?.value || '';\nconst attendanceRef  = change.meeting_attendance?.[0]?.value || '';\nconst newDate        = change.new_date || '';\n\nconst N8N_BASE   = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst approveUrl = `${N8N_BASE}/webhook/wf9-approve?id=${id}`;\nconst rejectUrl  = `${N8N_BASE}/webhook/wf9-reject?id=${id}`;\n\nconst linkedRows = [\n  instanceRef   ? `<tr><td><strong>Meeting Instance:</strong></td><td>${instanceRef}</td></tr>` : '',\n  teamMemberRef ? `<tr><td><strong>Team Member:</strong></td><td>${teamMemberRef}</td></tr>` : '',\n  attendanceRef ? `<tr><td><strong>Attendance Record:</strong></td><td>${attendanceRef}</td></tr>` : '',\n  newDate       ? `<tr><td><strong>Proposed New Date:</strong></td><td>${newDate}</td></tr>` : ''\n].filter(Boolean).join('');\n\n// Build substitution volunteer section if applicable\nlet substitutionHtml = '';\nif (changeType === 'substitution') {\n  try {\n    const volData = $('Fetch Active Volunteers').first().json;\n    const volunteers = volData.results || [];\n    if (volunteers.length > 0) {\n      const volRows = volunteers.map(v => {\n        const volId = v.id;\n        const volName = v.display_name || v.Name || `Volunteer ${volId}`;\n        const assignUrl = `${N8N_BASE}/webhook/wf9-approve?id=${id}&sub=${volId}`;\n        return `<tr>\n          <td style=\"padding:6px 12px;\">${volName}</td>\n          <td style=\"padding:6px 12px;\">\n            <a href=\"${assignUrl}\" style=\"background:#2980b9;color:white;padding:6px 14px;text-decoration:none;border-radius:3px;font-size:13px;\">Assign &amp; Approve</a>\n          </td>\n        </tr>`;\n      }).join('');\n      substitutionHtml = `\n        <br><hr>\n        <h3 style=\"color:#2c3e50;\">Assign a Substitute Volunteer</h3>\n        <p style=\"font-size:12px;color:#666;\">Click a volunteer below to assign them as substitute and approve this request simultaneously. Please verify their availability first.</p>\n        <table border=\"1\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:sans-serif;font-size:13px;border-collapse:collapse;border-color:#ddd;\">\n          <tr style=\"background:#f5f5f5;\"><th style=\"padding:8px 12px;text-align:left;\">Volunteer</th><th style=\"padding:8px 12px;text-align:left;\">Action</th></tr>\n          ${volRows}\n        </table>\n        <p style=\"font-size:12px;color:#888;margin-top:8px;\">Or use the standard Approve button above if you will arrange the substitute offline.</p>\n      `;\n    }\n  } catch(e) {\n    substitutionHtml = '<p style=\"color:#888;font-size:12px;\">(Could not load volunteer list)</p>';\n  }\n}\n\nconst emailHtml = `\n<h2>CTR-CRM: Proposed Change Requires Approval</h2>\n<table border=\"0\" cellpadding=\"8\" style=\"font-family:sans-serif;font-size:14px;\">\n  <tr><td><strong>Change Type:</strong></td><td>${changeType}</td></tr>\n  <tr><td><strong>Proposed By:</strong></td><td>${proposedBy}</td></tr>\n  <tr><td><strong>Submitted:</strong></td><td>${proposedAt}</td></tr>\n  <tr><td><strong>Description:</strong></td><td>${description}</td></tr>\n  ${linkedRows}\n  ${notes ? `<tr><td><strong>Notes:</strong></td><td>${notes}</td></tr>` : ''}\n</table><br>\n<p><strong>Take action:</strong></p>\n<p>\n  <a href=\"${approveUrl}\" style=\"background:#27ae60;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-size:16px;margin-right:16px;\">\u2713 Approve</a>\n  <a href=\"${rejectUrl}\" style=\"background:#e74c3c;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-size:16px;\">\u2717 Reject</a>\n</p>\n<p style=\"font-size:12px;color:#666;\">To reject with a reason, append <code>&amp;reason=YOUR+REASON</code> to the reject URL.</p>\n${substitutionHtml}\n<p style=\"font-size:11px;color:#999;\">Change ID: ${id}</p>\n`;\n\nreturn [{ json: {\n  proposed_change_id: id,\n  change_type: changeType,\n  proposed_by_name: proposedBy,\n  email_subject: `[CTR-CRM] Approval Required: ${changeType} by ${proposedBy}`,\n  email_html: emailHtml\n}}];"
+      },
+      "id": "wf9-0001-0001-0001-000000000006",
+      "name": "Build & Send Approval Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "={{ $('Build & Send Approval Email').item.json.email_subject }}",
+        "html": "={{ $('Build & Send Approval Email').item.json.email_html }}",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000007",
+      "name": "Email Admin (Approval Request)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        992,
+        928
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000008",
+      "name": "Fetch Change (Approve)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        96,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000009",
+      "name": "Mark Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                    "rightValue": "cancel_instance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_instance"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c2",
+                    "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                    "rightValue": "team_change",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "team_change"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c3",
+                    "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                    "rightValue": "substitution",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "substitution"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c4",
+                    "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                    "rightValue": "reschedule",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reschedule"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000010",
+      "name": "Branch on Change Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        544,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000011",
+      "name": "Apply: Cancel Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2112,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/{{ $('Fetch Change (Approve)').item.json.team_member[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000012",
+      "name": "Apply: Set End Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1216,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://baserow.conversationstoremember.org/api/database/rows/table/567/' + $('Fetch Change (Approve)').first().json.meeting_attendance[0].id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000013",
+      "name": "Apply: Substitution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        768,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000014",
+      "name": "Apply: Reschedule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1888,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "Your proposed change has been approved",
+        "text": "Your proposed change has been approved and applied. Thank you, CTR Admin Team",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000015",
+      "name": "Notify Proposer: Approved",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        3008,
+        1136
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:40px\"><h2 style=\"color:#27ae60\">\u2713 Approved</h2><p>The change has been approved and applied.</p><p><a href=\"https://baserow.conversationstoremember.org\">Return to Baserow</a></p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf9-0001-0001-0001-000000000016",
+      "name": "Respond: Approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3232,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000017",
+      "name": "Fetch Change (Reject)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        96,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000018",
+      "name": "Mark Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "Your proposed change was not approved",
+        "text": "Your proposed change was not approved. Please contact admin for details. CTR Admin Team",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000019",
+      "name": "Notify Proposer: Rejected",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        544,
+        1408
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:40px\"><h2 style=\"color:#e74c3c\">\u2717 Rejected</h2><p>The change has been rejected and the proposer notified.</p><p><a href=\"https://baserow.conversationstoremember.org\">Return to Baserow</a></p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf9-0001-0001-0001-000000000020",
+      "name": "Respond: Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        768,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $('Fetch Change (Incoming)').item.json.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000021",
+      "name": "Set Pending Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true&filter__field_5179__single_select_equal=active&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000022",
+      "name": "Fetch Active Volunteers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        544,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://baserow.conversationstoremember.org/api/database/rows/table/569/' + $('Fetch Change (Approve)').first().json.id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000023",
+      "name": "Assign Substitute Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        992,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.query.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000030",
+      "name": "Fetch Change (Approve Preview)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -128,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst change = $input.first().json;\nconst query  = $('Approve: Callback').first().json.query || {};\nconst id     = query.id || change.id;\nconst sub    = query.sub || '';\nconst changeType  = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy  = change.proposed_by?.[0]?.value || 'Unknown';\nconst description = change.description || '(no description)';\nconst notes       = change.notes || '';\nconst N8N_BASE    = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Confirm Approval \u2014 CTR-CRM</title>\n  <style>\n    body { font-family: sans-serif; max-width: 560px; margin: 60px auto; padding: 20px; color: #333; }\n    h2   { color: #27ae60; }\n    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }\n    td   { padding: 8px 12px; border-bottom: 1px solid #eee; }\n    td:first-child { font-weight: bold; width: 40%; color: #555; }\n    label { display: block; margin: 14px 0 4px; font-weight: bold; }\n    input { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }\n    .btn  { background: #27ae60; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 20px; width: 100%; }\n    .btn:hover { background: #219a52; }\n    .notice { background: #fff9e6; border-left: 4px solid #f39c12; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }\n  </style>\n</head>\n<body>\n  <h2>Confirm Approval</h2>\n  <div class=\"notice\">Please verify the change details and enter your name to confirm approval.</div>\n  <table>\n    <tr><td>Change Type</td><td>${changeType}</td></tr>\n    <tr><td>Proposed By</td><td>${proposedBy}</td></tr>\n    <tr><td>Description</td><td>${description}</td></tr>\n    ${notes ? `<tr><td>Notes</td><td>${notes}</td></tr>` : ''}\n  </table>\n  <form method=\"POST\" action=\"${N8N_BASE}/webhook/wf9-approve-confirm\">\n    <input type=\"hidden\" name=\"id\"  value=\"${id}\">\n    <input type=\"hidden\" name=\"sub\" value=\"${sub}\">\n    <label for=\"approver\">Your Full Name</label>\n    <input type=\"text\" id=\"approver\" name=\"approver\" placeholder=\"Enter your full name\" required autocomplete=\"off\">\n    <button type=\"submit\" class=\"btn\">\u2713 Confirm Approval</button>\n  </form>\n</body>\n</html>`;\nreturn [{ json: { html } }];\n"
+      },
+      "id": "wf9-0001-0001-0001-000000000031",
+      "name": "Build Approve Confirmation Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf9-0001-0001-0001-000000000032",
+      "name": "Respond: Show Approve Form",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        320,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf9-approve-confirm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000033",
+      "name": "Approve: Confirm",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1136
+      ],
+      "webhookId": "56e38d89-f8cf-4b2c-82b3-e4d5bafc25e2"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body     = $input.first().json.body || $input.first().json;\nconst approver = body.approver || 'Unknown';\nconst id       = body.id;\nconst sub      = body.sub || '';\nif (!approver || approver.trim() === '') {\n  throw new Error('Approver name is required.');\n}\nreturn [{ json: { proposed_change_id: id, sub, approver_name: approver.trim(), verified: true } }];\n"
+      },
+      "id": "wf9-0001-0001-0001-000000000034",
+      "name": "Verify Approve PIN",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.query.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000035",
+      "name": "Fetch Change (Reject Preview)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -128,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst change = $input.first().json;\nconst query  = $('Reject: Callback').first().json.query || {};\nconst id     = query.id || change.id;\nconst reason = query.reason || '';\nconst changeType  = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy  = change.proposed_by?.[0]?.value || 'Unknown';\nconst description = change.description || '(no description)';\nconst N8N_BASE    = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Confirm Rejection \u2014 CTR-CRM</title>\n  <style>\n    body { font-family: sans-serif; max-width: 560px; margin: 60px auto; padding: 20px; color: #333; }\n    h2   { color: #e74c3c; }\n    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }\n    td   { padding: 8px 12px; border-bottom: 1px solid #eee; }\n    td:first-child { font-weight: bold; width: 40%; color: #555; }\n    label { display: block; margin: 14px 0 4px; font-weight: bold; }\n    input, textarea { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }\n    textarea { height: 90px; resize: vertical; }\n    .btn  { background: #e74c3c; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 20px; width: 100%; }\n    .btn:hover { background: #c0392b; }\n    .notice { background: #fdf0f0; border-left: 4px solid #e74c3c; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }\n  </style>\n</head>\n<body>\n  <h2>Confirm Rejection</h2>\n  <div class=\"notice\">Please enter your name and provide a reason for rejecting this request.</div>\n  <table>\n    <tr><td>Change Type</td><td>${changeType}</td></tr>\n    <tr><td>Proposed By</td><td>${proposedBy}</td></tr>\n    <tr><td>Description</td><td>${description}</td></tr>\n  </table>\n  <form method=\"POST\" action=\"${N8N_BASE}/webhook/wf9-reject-confirm\">\n    <input type=\"hidden\" name=\"id\" value=\"${id}\">\n    <label for=\"approver\">Your Full Name</label>\n    <input type=\"text\" id=\"approver\" name=\"approver\" placeholder=\"Enter your full name\" required autocomplete=\"off\">\n    <label for=\"reason\">Reason for Rejection</label>\n    <textarea id=\"reason\" name=\"reason\" placeholder=\"Explain why this request is being rejected...\">${reason}</textarea>\n    <button type=\"submit\" class=\"btn\">\u2717 Confirm Rejection</button>\n  </form>\n</body>\n</html>`;\nreturn [{ json: { html } }];\n"
+      },
+      "id": "wf9-0001-0001-0001-000000000036",
+      "name": "Build Reject Confirmation Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf9-0001-0001-0001-000000000037",
+      "name": "Respond: Show Reject Form",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        320,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf9-reject-confirm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf9-0001-0001-0001-000000000038",
+      "name": "Reject: Confirm",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1408
+      ],
+      "webhookId": "592df077-2b1d-4921-921a-bc8f8777bce5"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body     = $input.first().json.body || $input.first().json;\nconst approver = body.approver || 'Unknown';\nconst id       = body.id;\nconst reason   = body.reason || '';\nif (!approver || approver.trim() === '') {\n  throw new Error('Approver name is required.');\n}\nreturn [{ json: { proposed_change_id: id, approver_name: approver.trim(), rejection_reason: reason, verified: true } }];\n"
+      },
+      "id": "wf9-0001-0001-0001-000000000039",
+      "name": "Verify Reject PIN",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "49eefb6e-f9d4-48e9-9a91-7bf130925608",
+      "name": "Get Meeting (Cancel)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2336,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Cancel)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Cancel)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Apply: Cancel Instance').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Apply: Cancel Instance').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "id": "b99a0cd7-3044-4607-9c0a-ad085e8b90cd",
+      "name": "Get Calendar Instance (Cancel)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        848
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Cancel)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "id": "fb4c48fd-11d5-41b3-8ebb-eda9e9e15987",
+      "name": "Delete Calendar Occurrence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2784,
+        848
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5ee820f-7d23-481f-a1a3-769479154966",
+      "name": "Get Meeting (Reschedule)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2112,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Reschedule)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Reschedule)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Apply: Reschedule').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Apply: Reschedule').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "id": "2e90d7b4-559d-41bb-8f90-9ccb9b11b326",
+      "name": "Get Calendar Instance (Reschedule)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2336,
+        1424
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const instance = $('Apply: Reschedule').item.json;\nconst calInstance = $input.first().json;\nconst occurrenceId = calInstance.items?.[0]?.id;\nconst newDate = instance.instance_date; // YYYY-MM-DD\nconst origStart = calInstance.items?.[0]?.start?.dateTime || '';\n// Keep same time, change date\nconst timePart = origStart.includes('T') ? origStart.split('T')[1] : '14:30:00Z';\nconst newStart = newDate + 'T' + timePart;\n// Compute end (assume 1 hour duration)\nconst startMs = new Date(newStart).getTime();\nconst newEnd = new Date(startMs + 3600000).toISOString();\nreturn [{ json: { occurrenceId, newStart, newEnd } }];"
+      },
+      "id": "28134ce9-1a6b-439e-aeb2-1d069eef1909",
+      "name": "Build Reschedule Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Reschedule)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"start\": {\"dateTime\": \"{{ $json.newStart }}\", \"timeZone\": \"America/New_York\"}, \"end\": {\"dateTime\": \"{{ $json.newEnd }}\", \"timeZone\": \"America/New_York\"}}",
+        "options": {}
+      },
+      "id": "ca03381b-4c69-4e37-ad02-8e0d8bc4bbfd",
+      "name": "Update Calendar Occurrence (Reschedule)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2784,
+        1424
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf3a2455-c8ad-4c13-a938-5a4d6f7a1acb",
+      "name": "Get Instance (Sub)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1216,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33a095c5-b4da-4492-b5b7-6714627fc271",
+      "name": "Get Meeting (Sub)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $('Assign Substitute Volunteer').item.json.substitute_volunteer?.[0]?.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1c84043d-e6ba-42f5-bf71-1fb552e13985",
+      "name": "Get Sub Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1664,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3ce7690-9d06-4837-8423-ee515d42b6f3",
+      "name": "Get Sub Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1888,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meeting = $('Get Meeting (Sub)').item.json;\nconst instance = $('Get Instance (Sub)').item.json;\nconst subPerson = $input.first().json;\nconst subEmail = subPerson.email || '';\nconst subName = subPerson.Name || (subPerson.first_name + ' ' + subPerson.last_name);\nconst meetingLink = meeting.meeting_link || '';\n\n// Get existing attendees from instance or meeting\nconst calEventId = meeting.calendar_event_id;\nconst instanceStart = instance.instance_start;\n\nreturn [{ json: { calEventId, instanceStart, subEmail, subName, meetingLink } }];"
+      },
+      "id": "1af60a98-0fd8-464f-816e-054ea811edde",
+      "name": "Build Sub Calendar Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Sub)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Sub)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Get Instance (Sub)').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Get Instance (Sub)').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "id": "08a48e7a-38db-4b87-a28e-fc16180e95ec",
+      "name": "Get Calendar Instance (Sub)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2336,
+        1232
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Sub)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"summary\": \"CTR Visit (Sub: {{ $(\\\"Build Sub Calendar Patch\\\").item.json.subName }})\", \"attendees\": [{\"email\": \"{{ $(\\\"Build Sub Calendar Patch\\\").item.json.subEmail }}\"}]}",
+        "options": {}
+      },
+      "id": "2d0cb6b2-252e-495b-a253-866fce0ca142",
+      "name": "Patch Calendar Occurrence (Sub)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        1232
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $(\"Build Sub Calendar Patch\").item.json.subEmail }}",
+        "subject": "=CTR Visit Substitution \u2014 You're covering a session!",
+        "html": "=<p>Hi {{ $(\"Build Sub Calendar Patch\").item.json.subName }},</p><p>You have been assigned as a <strong>substitute volunteer</strong> for an upcoming CTR visit.</p><p><strong>Meeting link:</strong> <a href=\"{{ $(\"Build Sub Calendar Patch\").item.json.meetingLink }}\">{{ $(\"Build Sub Calendar Patch\").item.json.meetingLink }}</a></p><p>Please join at the scheduled time. The director will be in touch if you have questions.</p><p>Thank you for stepping in!<br>CTR Team</p>",
+        "options": {}
+      },
+      "id": "d50caacf-9cd1-4a13-82a7-1d12c0fb7aef",
+      "name": "Email Substitute Volunteer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2784,
+        1232
+      ],
+      "webhookId": "d13956ad-c41f-44b5-b11f-01566673a927",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/{{ $('Fetch Change (Approve)').item.json.team_member[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41846e9b-a703-4cfc-b21e-fda208482db6",
+      "name": "Get Team Member Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&filter__team__link_row_has={{ $json.team[0].id }}&size=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "25288552-16c7-48b4-86c4-fa6ee5976279",
+      "name": "Get Meeting for Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1664,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting for Team').item.json.results[0].google_calendar_id) }}/events/{{ $('Get Meeting for Team').item.json.results[0].calendar_event_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "id": "50abef78-3209-44bd-8987-dfc1c14f9649",
+      "name": "Delete Old Calendar Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1888,
+        1040
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filter__team__link_row_has={{ $('Get Meeting for Team').item.json.results[0].team[0].id }}&size=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f04473ae-a88e-42e6-a93b-87baece2a3f5",
+      "name": "Get Active Members (Team Change)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2112,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meeting = $('Get Meeting for Team').item.json.results[0];\nconst members = $input.first().json.results || [];\n// Filter active (no end_date)\nconst activeMembers = members.filter(m => !m.end_date);\nconst volunteerIds = activeMembers.map(m => m.volunteer?.[0]?.id).filter(Boolean);\n\nconst day = meeting.meeting_day_of_week?.value || 'Monday';\nconst time = meeting.meeting_time || '14:30';\nconst teamName = meeting.team?.[0]?.value || 'CTR Team';\n\nconst dayMap = {Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6,Sunday:0};\nconst targetDay = dayMap[day] ?? 1;\nconst now = new Date();\nconst daysUntil = (targetDay - now.getDay() + 7) % 7 || 7;\nconst nextDate = new Date(now);\nnextDate.setDate(now.getDate() + daysUntil);\nconst dateStr = nextDate.toISOString().split('T')[0];\nconst startISO = dateStr + 'T' + time + ':00';\nconst endISO = dateStr + 'T' + (parseInt(time.split(':')[0]) + 1).toString().padStart(2,'0') + ':' + time.split(':')[1] + ':00';\n\nreturn [{ json: {\n  summary: 'CTR Visit: ' + teamName,\n  description: 'Weekly CTR volunteer visit',\n  startISO, endISO,\n  meetingId: meeting.id,\n  meetingLink: meeting.meeting_link || '',\n  timeZone: 'America/New_York',\n  volunteerIds,\n  rruleDay: day.slice(0,2).toUpperCase()\n}}];"
+      },
+      "id": "7693f7df-bd21-40e9-b949-9df92bab62db",
+      "name": "Build New Team Event Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2336,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting for Team').item.json.results[0].google_calendar_id) }}/events?sendUpdates=all",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": {{ JSON.stringify($json.summary) }},\n  \"location\": {{ JSON.stringify($json.meetingLink) }},\n  \"start\": { \"dateTime\": \"{{ $json.startISO }}\", \"timeZone\": \"{{ $json.timeZone }}\" },\n  \"end\": { \"dateTime\": \"{{ $json.endISO }}\", \"timeZone\": \"{{ $json.timeZone }}\" },\n  \"recurrence\": [\"RRULE:FREQ=WEEKLY;BYDAY={{ $json.rruleDay }}\"],\n  \"reminders\": { \"useDefault\": true }\n}",
+        "options": {}
+      },
+      "id": "fc61b4d6-7eea-40a9-b8bd-8d935b169e14",
+      "name": "Create New Calendar Event (Team Change)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        1040
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $('Get Meeting for Team').item.json.results[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"field_6978\": \"{{ $json.id }}\"}",
+        "options": {}
+      },
+      "id": "d63d1c1a-04d4-40f4-8130-bde963ffa164",
+      "name": "Update MEETING Calendar ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2784,
+        1040
+      ]
+    }
+  ],
+  "connections": {
+    "Incoming: Proposed Change": {
+      "main": [
+        [
+          {
+            "node": "Parse Change ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Change ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Change (Incoming)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Change (Incoming)": {
+      "main": [
+        [
+          {
+            "node": "Set Pending Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build & Send Approval Email": {
+      "main": [
+        [
+          {
+            "node": "Email Admin (Approval Request)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve: Callback": {
+      "main": [
+        [
+          {
+            "node": "Fetch Change (Approve Preview)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Change (Approve)": {
+      "main": [
+        [
+          {
+            "node": "Mark Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Approved": {
+      "main": [
+        [
+          {
+            "node": "Branch on Change Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch on Change Type": {
+      "main": [
+        [
+          {
+            "node": "Apply: Cancel Instance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply: Set End Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply: Substitution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply: Reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply: Cancel Instance": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting (Cancel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply: Set End Date": {
+      "main": [
+        [
+          {
+            "node": "Get Team Member Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply: Substitution": {
+      "main": [
+        [
+          {
+            "node": "Assign Substitute Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply: Reschedule": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting (Reschedule)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Proposer: Approved": {
+      "main": [
+        [
+          {
+            "node": "Respond: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject: Callback": {
+      "main": [
+        [
+          {
+            "node": "Fetch Change (Reject Preview)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Change (Reject)": {
+      "main": [
+        [
+          {
+            "node": "Mark Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Rejected": {
+      "main": [
+        [
+          {
+            "node": "Notify Proposer: Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Proposer: Rejected": {
+      "main": [
+        [
+          {
+            "node": "Respond: Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Pending Status": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Volunteers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Volunteers": {
+      "main": [
+        [
+          {
+            "node": "Build & Send Approval Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Substitute Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Get Instance (Sub)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Change (Approve Preview)": {
+      "main": [
+        [
+          {
+            "node": "Build Approve Confirmation Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approve Confirmation Page": {
+      "main": [
+        [
+          {
+            "node": "Respond: Show Approve Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve: Confirm": {
+      "main": [
+        [
+          {
+            "node": "Verify Approve PIN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Approve PIN": {
+      "main": [
+        [
+          {
+            "node": "Fetch Change (Approve)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Change (Reject Preview)": {
+      "main": [
+        [
+          {
+            "node": "Build Reject Confirmation Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reject Confirmation Page": {
+      "main": [
+        [
+          {
+            "node": "Respond: Show Reject Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject: Confirm": {
+      "main": [
+        [
+          {
+            "node": "Verify Reject PIN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Reject PIN": {
+      "main": [
+        [
+          {
+            "node": "Fetch Change (Reject)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting (Cancel)": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Instance (Cancel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Instance (Cancel)": {
+      "main": [
+        [
+          {
+            "node": "Delete Calendar Occurrence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Calendar Occurrence": {
+      "main": [
+        [
+          {
+            "node": "Notify Proposer: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting (Reschedule)": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Instance (Reschedule)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Instance (Reschedule)": {
+      "main": [
+        [
+          {
+            "node": "Build Reschedule Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reschedule Payload": {
+      "main": [
+        [
+          {
+            "node": "Update Calendar Occurrence (Reschedule)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Calendar Occurrence (Reschedule)": {
+      "main": [
+        [
+          {
+            "node": "Notify Proposer: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Instance (Sub)": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting (Sub)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting (Sub)": {
+      "main": [
+        [
+          {
+            "node": "Get Sub Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sub Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Get Sub Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sub Person": {
+      "main": [
+        [
+          {
+            "node": "Build Sub Calendar Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sub Calendar Patch": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Instance (Sub)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Instance (Sub)": {
+      "main": [
+        [
+          {
+            "node": "Patch Calendar Occurrence (Sub)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Calendar Occurrence (Sub)": {
+      "main": [
+        [
+          {
+            "node": "Email Substitute Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Substitute Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Notify Proposer: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Team Member Details": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting for Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting for Team": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Get Active Members (Team Change)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Members (Team Change)": {
+      "main": [
+        [
+          {
+            "node": "Build New Team Event Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build New Team Event Payload": {
+      "main": [
+        [
+          {
+            "node": "Create New Calendar Event (Team Change)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Calendar Event (Team Change)": {
+      "main": [
+        [
+          {
+            "node": "Update MEETING Calendar ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update MEETING Calendar ID": {
+      "main": [
+        [
+          {
+            "node": "Notify Proposer: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "c20b2194-2643-496d-86cf-d6a4d1a2c147",
+  "activeVersionId": "c20b2194-2643-496d-86cf-d6a4d1a2c147",
+  "versionCounter": 135,
+  "triggerCount": 5,
+  "shared": [
+    {
+      "updatedAt": "2026-03-18T04:07:48.667Z",
+      "createdAt": "2026-03-18T04:07:48.667Z",
+      "role": "workflow:owner",
+      "workflowId": "ZWb7c4a4TOtLuSHL",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:35:57.000Z",
+    "createdAt": "2026-03-21T18:35:48.040Z",
+    "versionId": "c20b2194-2643-496d-86cf-d6a4d1a2c147",
+    "workflowId": "ZWb7c4a4TOtLuSHL",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf9-proposed-change",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000001",
+        "name": "Incoming: Proposed Change",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          928
+        ],
+        "webhookId": "wf9-proposed-change"
+      },
+      {
+        "parameters": {
+          "path": "wf9-approve",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000002",
+        "name": "Approve: Callback",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          1632
+        ],
+        "webhookId": "wf9-approve"
+      },
+      {
+        "parameters": {
+          "path": "wf9-reject",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000003",
+        "name": "Reject: Callback",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          1856
+        ],
+        "webhookId": "wf9-reject"
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json;\n// n8n webhook v2 puts body at .body, v1 puts it at root\nconst body = raw.body || raw;\nconst id = (body.items && body.items[0] && body.items[0].id) || null;\nif (!id) throw new Error('Cannot extract proposed_change_id from webhook payload');\nreturn [{ json: { proposed_change_id: id } }];"
+        },
+        "id": "wf9-0001-0001-0001-000000000004",
+        "name": "Parse Change ID",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -128,
+          928
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000005",
+        "name": "Fetch Change (Incoming)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          96,
+          928
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const change = $('Fetch Change (Incoming)').first().json;\nconst id = change.id;\n\nconst changeType   = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy   = change.proposed_by_email?.value ||change.proposed_by_email || 'Unknown';\nconst description  = change.description || '(no description)';\nconst notes        = change.notes || '';\nconst proposedAt   = change.proposed_at || new Date().toISOString();\n\nconst instanceRef    = change.meeting_instance?.[0]?.value || '';\nconst teamMemberRef  = change.team_member?.[0]?.value || '';\nconst attendanceRef  = change.meeting_attendance?.[0]?.value || '';\nconst newDate        = change.new_date || '';\n\nconst N8N_BASE   = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst approveUrl = `${N8N_BASE}/webhook/wf9-approve?id=${id}`;\nconst rejectUrl  = `${N8N_BASE}/webhook/wf9-reject?id=${id}`;\n\nconst linkedRows = [\n  instanceRef   ? `<tr><td><strong>Meeting Instance:</strong></td><td>${instanceRef}</td></tr>` : '',\n  teamMemberRef ? `<tr><td><strong>Team Member:</strong></td><td>${teamMemberRef}</td></tr>` : '',\n  attendanceRef ? `<tr><td><strong>Attendance Record:</strong></td><td>${attendanceRef}</td></tr>` : '',\n  newDate       ? `<tr><td><strong>Proposed New Date:</strong></td><td>${newDate}</td></tr>` : ''\n].filter(Boolean).join('');\n\n// Build substitution volunteer section if applicable\nlet substitutionHtml = '';\nif (changeType === 'substitution') {\n  try {\n    const volData = $('Fetch Active Volunteers').first().json;\n    const volunteers = volData.results || [];\n    if (volunteers.length > 0) {\n      const volRows = volunteers.map(v => {\n        const volId = v.id;\n        const volName = v.display_name || v.Name || `Volunteer ${volId}`;\n        const assignUrl = `${N8N_BASE}/webhook/wf9-approve?id=${id}&sub=${volId}`;\n        return `<tr>\n          <td style=\"padding:6px 12px;\">${volName}</td>\n          <td style=\"padding:6px 12px;\">\n            <a href=\"${assignUrl}\" style=\"background:#2980b9;color:white;padding:6px 14px;text-decoration:none;border-radius:3px;font-size:13px;\">Assign &amp; Approve</a>\n          </td>\n        </tr>`;\n      }).join('');\n      substitutionHtml = `\n        <br><hr>\n        <h3 style=\"color:#2c3e50;\">Assign a Substitute Volunteer</h3>\n        <p style=\"font-size:12px;color:#666;\">Click a volunteer below to assign them as substitute and approve this request simultaneously. Please verify their availability first.</p>\n        <table border=\"1\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:sans-serif;font-size:13px;border-collapse:collapse;border-color:#ddd;\">\n          <tr style=\"background:#f5f5f5;\"><th style=\"padding:8px 12px;text-align:left;\">Volunteer</th><th style=\"padding:8px 12px;text-align:left;\">Action</th></tr>\n          ${volRows}\n        </table>\n        <p style=\"font-size:12px;color:#888;margin-top:8px;\">Or use the standard Approve button above if you will arrange the substitute offline.</p>\n      `;\n    }\n  } catch(e) {\n    substitutionHtml = '<p style=\"color:#888;font-size:12px;\">(Could not load volunteer list)</p>';\n  }\n}\n\nconst emailHtml = `\n<h2>CTR-CRM: Proposed Change Requires Approval</h2>\n<table border=\"0\" cellpadding=\"8\" style=\"font-family:sans-serif;font-size:14px;\">\n  <tr><td><strong>Change Type:</strong></td><td>${changeType}</td></tr>\n  <tr><td><strong>Proposed By:</strong></td><td>${proposedBy}</td></tr>\n  <tr><td><strong>Submitted:</strong></td><td>${proposedAt}</td></tr>\n  <tr><td><strong>Description:</strong></td><td>${description}</td></tr>\n  ${linkedRows}\n  ${notes ? `<tr><td><strong>Notes:</strong></td><td>${notes}</td></tr>` : ''}\n</table><br>\n<p><strong>Take action:</strong></p>\n<p>\n  <a href=\"${approveUrl}\" style=\"background:#27ae60;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-size:16px;margin-right:16px;\">\u2713 Approve</a>\n  <a href=\"${rejectUrl}\" style=\"background:#e74c3c;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-size:16px;\">\u2717 Reject</a>\n</p>\n<p style=\"font-size:12px;color:#666;\">To reject with a reason, append <code>&amp;reason=YOUR+REASON</code> to the reject URL.</p>\n${substitutionHtml}\n<p style=\"font-size:11px;color:#999;\">Change ID: ${id}</p>\n`;\n\nreturn [{ json: {\n  proposed_change_id: id,\n  change_type: changeType,\n  proposed_by_name: proposedBy,\n  email_subject: `[CTR-CRM] Approval Required: ${changeType} by ${proposedBy}`,\n  email_html: emailHtml\n}}];"
+        },
+        "id": "wf9-0001-0001-0001-000000000006",
+        "name": "Build & Send Approval Email",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          768,
+          928
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "={{ $('Build & Send Approval Email').item.json.email_subject }}",
+          "html": "={{ $('Build & Send Approval Email').item.json.email_html }}",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000007",
+        "name": "Email Admin (Approval Request)",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [
+          992,
+          928
+        ],
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000008",
+        "name": "Fetch Change (Approve)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          96,
+          1136
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000009",
+        "name": "Mark Approved",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          320,
+          1136
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c1",
+                      "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                      "rightValue": "cancel_instance",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "cancel_instance"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c2",
+                      "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                      "rightValue": "team_change",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "team_change"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c3",
+                      "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                      "rightValue": "substitution",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "substitution"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c4",
+                      "leftValue": "={{ $('Fetch Change (Approve)').item.json.change_type?.value }}",
+                      "rightValue": "reschedule",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "reschedule"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000010",
+        "name": "Branch on Change Type",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          544,
+          1104
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000011",
+        "name": "Apply: Cancel Instance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          2112,
+          848
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/{{ $('Fetch Change (Approve)').item.json.team_member[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000012",
+        "name": "Apply: Set End Date",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1216,
+          1040
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://baserow.conversationstoremember.org/api/database/rows/table/567/' + $('Fetch Change (Approve)').first().json.meeting_attendance[0].id + '/?user_field_names=true' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000013",
+        "name": "Apply: Substitution",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          768,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000014",
+        "name": "Apply: Reschedule",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1888,
+          1424
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "Your proposed change has been approved",
+          "text": "Your proposed change has been approved and applied. Thank you, CTR Admin Team",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000015",
+        "name": "Notify Proposer: Approved",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [
+          3008,
+          1136
+        ],
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:40px\"><h2 style=\"color:#27ae60\">\u2713 Approved</h2><p>The change has been approved and applied.</p><p><a href=\"https://baserow.conversationstoremember.org\">Return to Baserow</a></p></body></html>",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/html"
+                }
+              ]
+            }
+          }
+        },
+        "id": "wf9-0001-0001-0001-000000000016",
+        "name": "Respond: Approved",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          3232,
+          1136
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.proposed_change_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000017",
+        "name": "Fetch Change (Reject)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          96,
+          1408
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000018",
+        "name": "Mark Rejected",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          320,
+          1408
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "Your proposed change was not approved",
+          "text": "Your proposed change was not approved. Please contact admin for details. CTR Admin Team",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000019",
+        "name": "Notify Proposer: Rejected",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [
+          544,
+          1408
+        ],
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:40px\"><h2 style=\"color:#e74c3c\">\u2717 Rejected</h2><p>The change has been rejected and the proposer notified.</p><p><a href=\"https://baserow.conversationstoremember.org\">Return to Baserow</a></p></body></html>",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/html"
+                }
+              ]
+            }
+          }
+        },
+        "id": "wf9-0001-0001-0001-000000000020",
+        "name": "Respond: Rejected",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          768,
+          1408
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $('Fetch Change (Incoming)').item.json.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000021",
+        "name": "Set Pending Status",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          320,
+          928
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true&filter__field_5179__single_select_equal=active&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000022",
+        "name": "Fetch Active Volunteers",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          544,
+          928
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://baserow.conversationstoremember.org/api/database/rows/table/569/' + $('Fetch Change (Approve)').first().json.id + '/?user_field_names=true' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000023",
+        "name": "Assign Substitute Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          992,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.query.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000030",
+        "name": "Fetch Change (Approve Preview)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -128,
+          1632
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst change = $input.first().json;\nconst query  = $('Approve: Callback').first().json.query || {};\nconst id     = query.id || change.id;\nconst sub    = query.sub || '';\nconst changeType  = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy  = change.proposed_by?.[0]?.value || 'Unknown';\nconst description = change.description || '(no description)';\nconst notes       = change.notes || '';\nconst N8N_BASE    = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Confirm Approval \u2014 CTR-CRM</title>\n  <style>\n    body { font-family: sans-serif; max-width: 560px; margin: 60px auto; padding: 20px; color: #333; }\n    h2   { color: #27ae60; }\n    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }\n    td   { padding: 8px 12px; border-bottom: 1px solid #eee; }\n    td:first-child { font-weight: bold; width: 40%; color: #555; }\n    label { display: block; margin: 14px 0 4px; font-weight: bold; }\n    input { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }\n    .btn  { background: #27ae60; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 20px; width: 100%; }\n    .btn:hover { background: #219a52; }\n    .notice { background: #fff9e6; border-left: 4px solid #f39c12; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }\n  </style>\n</head>\n<body>\n  <h2>Confirm Approval</h2>\n  <div class=\"notice\">Please verify the change details and enter your name to confirm approval.</div>\n  <table>\n    <tr><td>Change Type</td><td>${changeType}</td></tr>\n    <tr><td>Proposed By</td><td>${proposedBy}</td></tr>\n    <tr><td>Description</td><td>${description}</td></tr>\n    ${notes ? `<tr><td>Notes</td><td>${notes}</td></tr>` : ''}\n  </table>\n  <form method=\"POST\" action=\"${N8N_BASE}/webhook/wf9-approve-confirm\">\n    <input type=\"hidden\" name=\"id\"  value=\"${id}\">\n    <input type=\"hidden\" name=\"sub\" value=\"${sub}\">\n    <label for=\"approver\">Your Full Name</label>\n    <input type=\"text\" id=\"approver\" name=\"approver\" placeholder=\"Enter your full name\" required autocomplete=\"off\">\n    <button type=\"submit\" class=\"btn\">\u2713 Confirm Approval</button>\n  </form>\n</body>\n</html>`;\nreturn [{ json: { html } }];\n"
+        },
+        "id": "wf9-0001-0001-0001-000000000031",
+        "name": "Build Approve Confirmation Page",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          96,
+          1632
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "={{ $json.html }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/html; charset=utf-8"
+                }
+              ]
+            }
+          }
+        },
+        "id": "wf9-0001-0001-0001-000000000032",
+        "name": "Respond: Show Approve Form",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          320,
+          1632
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf9-approve-confirm",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000033",
+        "name": "Approve: Confirm",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          1136
+        ],
+        "webhookId": "56e38d89-f8cf-4b2c-82b3-e4d5bafc25e2"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst body     = $input.first().json.body || $input.first().json;\nconst approver = body.approver || 'Unknown';\nconst id       = body.id;\nconst sub      = body.sub || '';\nif (!approver || approver.trim() === '') {\n  throw new Error('Approver name is required.');\n}\nreturn [{ json: { proposed_change_id: id, sub, approver_name: approver.trim(), verified: true } }];\n"
+        },
+        "id": "wf9-0001-0001-0001-000000000034",
+        "name": "Verify Approve PIN",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -128,
+          1136
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/569/{{ $json.query.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000035",
+        "name": "Fetch Change (Reject Preview)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -128,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst change = $input.first().json;\nconst query  = $('Reject: Callback').first().json.query || {};\nconst id     = query.id || change.id;\nconst reason = query.reason || '';\nconst changeType  = change.change_type?.value || change.change_type || 'unknown';\nconst proposedBy  = change.proposed_by?.[0]?.value || 'Unknown';\nconst description = change.description || '(no description)';\nconst N8N_BASE    = 'https://mzxxpk48-5678.usw3.devtunnels.ms';\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Confirm Rejection \u2014 CTR-CRM</title>\n  <style>\n    body { font-family: sans-serif; max-width: 560px; margin: 60px auto; padding: 20px; color: #333; }\n    h2   { color: #e74c3c; }\n    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }\n    td   { padding: 8px 12px; border-bottom: 1px solid #eee; }\n    td:first-child { font-weight: bold; width: 40%; color: #555; }\n    label { display: block; margin: 14px 0 4px; font-weight: bold; }\n    input, textarea { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }\n    textarea { height: 90px; resize: vertical; }\n    .btn  { background: #e74c3c; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 20px; width: 100%; }\n    .btn:hover { background: #c0392b; }\n    .notice { background: #fdf0f0; border-left: 4px solid #e74c3c; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }\n  </style>\n</head>\n<body>\n  <h2>Confirm Rejection</h2>\n  <div class=\"notice\">Please enter your name and provide a reason for rejecting this request.</div>\n  <table>\n    <tr><td>Change Type</td><td>${changeType}</td></tr>\n    <tr><td>Proposed By</td><td>${proposedBy}</td></tr>\n    <tr><td>Description</td><td>${description}</td></tr>\n  </table>\n  <form method=\"POST\" action=\"${N8N_BASE}/webhook/wf9-reject-confirm\">\n    <input type=\"hidden\" name=\"id\" value=\"${id}\">\n    <label for=\"approver\">Your Full Name</label>\n    <input type=\"text\" id=\"approver\" name=\"approver\" placeholder=\"Enter your full name\" required autocomplete=\"off\">\n    <label for=\"reason\">Reason for Rejection</label>\n    <textarea id=\"reason\" name=\"reason\" placeholder=\"Explain why this request is being rejected...\">${reason}</textarea>\n    <button type=\"submit\" class=\"btn\">\u2717 Confirm Rejection</button>\n  </form>\n</body>\n</html>`;\nreturn [{ json: { html } }];\n"
+        },
+        "id": "wf9-0001-0001-0001-000000000036",
+        "name": "Build Reject Confirmation Page",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          96,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "={{ $json.html }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/html; charset=utf-8"
+                }
+              ]
+            }
+          }
+        },
+        "id": "wf9-0001-0001-0001-000000000037",
+        "name": "Respond: Show Reject Form",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          320,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf9-reject-confirm",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wf9-0001-0001-0001-000000000038",
+        "name": "Reject: Confirm",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          1408
+        ],
+        "webhookId": "592df077-2b1d-4921-921a-bc8f8777bce5"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst body     = $input.first().json.body || $input.first().json;\nconst approver = body.approver || 'Unknown';\nconst id       = body.id;\nconst reason   = body.reason || '';\nif (!approver || approver.trim() === '') {\n  throw new Error('Approver name is required.');\n}\nreturn [{ json: { proposed_change_id: id, approver_name: approver.trim(), rejection_reason: reason, verified: true } }];\n"
+        },
+        "id": "wf9-0001-0001-0001-000000000039",
+        "name": "Verify Reject PIN",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -128,
+          1408
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "49eefb6e-f9d4-48e9-9a91-7bf130925608",
+        "name": "Get Meeting (Cancel)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2336,
+          848
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Cancel)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Cancel)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Apply: Cancel Instance').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Apply: Cancel Instance').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "id": "b99a0cd7-3044-4607-9c0a-ad085e8b90cd",
+        "name": "Get Calendar Instance (Cancel)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2560,
+          848
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "DELETE",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Cancel)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "id": "fb4c48fd-11d5-41b3-8ebb-eda9e9e15987",
+        "name": "Delete Calendar Occurrence",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2784,
+          848
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "d5ee820f-7d23-481f-a1a3-769479154966",
+        "name": "Get Meeting (Reschedule)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2112,
+          1424
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Reschedule)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Reschedule)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Apply: Reschedule').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Apply: Reschedule').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "id": "2e90d7b4-559d-41bb-8f90-9ccb9b11b326",
+        "name": "Get Calendar Instance (Reschedule)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2336,
+          1424
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const instance = $('Apply: Reschedule').item.json;\nconst calInstance = $input.first().json;\nconst occurrenceId = calInstance.items?.[0]?.id;\nconst newDate = instance.instance_date; // YYYY-MM-DD\nconst origStart = calInstance.items?.[0]?.start?.dateTime || '';\n// Keep same time, change date\nconst timePart = origStart.includes('T') ? origStart.split('T')[1] : '14:30:00Z';\nconst newStart = newDate + 'T' + timePart;\n// Compute end (assume 1 hour duration)\nconst startMs = new Date(newStart).getTime();\nconst newEnd = new Date(startMs + 3600000).toISOString();\nreturn [{ json: { occurrenceId, newStart, newEnd } }];"
+        },
+        "id": "28134ce9-1a6b-439e-aeb2-1d069eef1909",
+        "name": "Build Reschedule Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2560,
+          1424
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Reschedule)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"start\": {\"dateTime\": \"{{ $json.newStart }}\", \"timeZone\": \"America/New_York\"}, \"end\": {\"dateTime\": \"{{ $json.newEnd }}\", \"timeZone\": \"America/New_York\"}}",
+          "options": {}
+        },
+        "id": "ca03381b-4c69-4e37-ad02-8e0d8bc4bbfd",
+        "name": "Update Calendar Occurrence (Reschedule)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2784,
+          1424
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $('Fetch Change (Approve)').item.json.meeting_instance[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bf3a2455-c8ad-4c13-a938-5a4d6f7a1acb",
+        "name": "Get Instance (Sub)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1216,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "33a095c5-b4da-4492-b5b7-6714627fc271",
+        "name": "Get Meeting (Sub)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1440,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $('Assign Substitute Volunteer').item.json.substitute_volunteer?.[0]?.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "1c84043d-e6ba-42f5-bf71-1fb552e13985",
+        "name": "Get Sub Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1664,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "b3ce7690-9d06-4837-8423-ee515d42b6f3",
+        "name": "Get Sub Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1888,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const meeting = $('Get Meeting (Sub)').item.json;\nconst instance = $('Get Instance (Sub)').item.json;\nconst subPerson = $input.first().json;\nconst subEmail = subPerson.email || '';\nconst subName = subPerson.Name || (subPerson.first_name + ' ' + subPerson.last_name);\nconst meetingLink = meeting.meeting_link || '';\n\n// Get existing attendees from instance or meeting\nconst calEventId = meeting.calendar_event_id;\nconst instanceStart = instance.instance_start;\n\nreturn [{ json: { calEventId, instanceStart, subEmail, subName, meetingLink } }];"
+        },
+        "id": "1af60a98-0fd8-464f-816e-054ea811edde",
+        "name": "Build Sub Calendar Patch",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2112,
+          1232
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Sub)').item.json.google_calendar_id) }}/events/{{ $('Get Meeting (Sub)').item.json.calendar_event_id }}/instances?timeMin={{ encodeURIComponent($('Get Instance (Sub)').item.json.instance_start) }}&timeMax={{ encodeURIComponent($('Get Instance (Sub)').item.json.instance_end) }}&singleEvents=true&maxResults=1",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "id": "08a48e7a-38db-4b87-a28e-fc16180e95ec",
+        "name": "Get Calendar Instance (Sub)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2336,
+          1232
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting (Sub)').item.json.google_calendar_id) }}/events/{{ $json.items[0].id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"summary\": \"CTR Visit (Sub: {{ $(\\\"Build Sub Calendar Patch\\\").item.json.subName }})\", \"attendees\": [{\"email\": \"{{ $(\\\"Build Sub Calendar Patch\\\").item.json.subEmail }}\"}]}",
+          "options": {}
+        },
+        "id": "2d0cb6b2-252e-495b-a253-866fce0ca142",
+        "name": "Patch Calendar Occurrence (Sub)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2560,
+          1232
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $(\"Build Sub Calendar Patch\").item.json.subEmail }}",
+          "subject": "=CTR Visit Substitution \u2014 You're covering a session!",
+          "html": "=<p>Hi {{ $(\"Build Sub Calendar Patch\").item.json.subName }},</p><p>You have been assigned as a <strong>substitute volunteer</strong> for an upcoming CTR visit.</p><p><strong>Meeting link:</strong> <a href=\"{{ $(\"Build Sub Calendar Patch\").item.json.meetingLink }}\">{{ $(\"Build Sub Calendar Patch\").item.json.meetingLink }}</a></p><p>Please join at the scheduled time. The director will be in touch if you have questions.</p><p>Thank you for stepping in!<br>CTR Team</p>",
+          "options": {}
+        },
+        "id": "d50caacf-9cd1-4a13-82a7-1d12c0fb7aef",
+        "name": "Email Substitute Volunteer",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          2784,
+          1232
+        ],
+        "webhookId": "d13956ad-c41f-44b5-b11f-01566673a927",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/{{ $('Fetch Change (Approve)').item.json.team_member[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "41846e9b-a703-4cfc-b21e-fda208482db6",
+        "name": "Get Team Member Details",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1440,
+          1040
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&filter__team__link_row_has={{ $json.team[0].id }}&size=1",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "25288552-16c7-48b4-86c4-fa6ee5976279",
+        "name": "Get Meeting for Team",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1664,
+          1040
+        ]
+      },
+      {
+        "parameters": {
+          "method": "DELETE",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting for Team').item.json.results[0].google_calendar_id) }}/events/{{ $('Get Meeting for Team').item.json.results[0].calendar_event_id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "id": "50abef78-3209-44bd-8987-dfc1c14f9649",
+        "name": "Delete Old Calendar Event",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1888,
+          1040
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filter__team__link_row_has={{ $('Get Meeting for Team').item.json.results[0].team[0].id }}&size=50",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "f04473ae-a88e-42e6-a93b-87baece2a3f5",
+        "name": "Get Active Members (Team Change)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2112,
+          1040
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const meeting = $('Get Meeting for Team').item.json.results[0];\nconst members = $input.first().json.results || [];\n// Filter active (no end_date)\nconst activeMembers = members.filter(m => !m.end_date);\nconst volunteerIds = activeMembers.map(m => m.volunteer?.[0]?.id).filter(Boolean);\n\nconst day = meeting.meeting_day_of_week?.value || 'Monday';\nconst time = meeting.meeting_time || '14:30';\nconst teamName = meeting.team?.[0]?.value || 'CTR Team';\n\nconst dayMap = {Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6,Sunday:0};\nconst targetDay = dayMap[day] ?? 1;\nconst now = new Date();\nconst daysUntil = (targetDay - now.getDay() + 7) % 7 || 7;\nconst nextDate = new Date(now);\nnextDate.setDate(now.getDate() + daysUntil);\nconst dateStr = nextDate.toISOString().split('T')[0];\nconst startISO = dateStr + 'T' + time + ':00';\nconst endISO = dateStr + 'T' + (parseInt(time.split(':')[0]) + 1).toString().padStart(2,'0') + ':' + time.split(':')[1] + ':00';\n\nreturn [{ json: {\n  summary: 'CTR Visit: ' + teamName,\n  description: 'Weekly CTR volunteer visit',\n  startISO, endISO,\n  meetingId: meeting.id,\n  meetingLink: meeting.meeting_link || '',\n  timeZone: 'America/New_York',\n  volunteerIds,\n  rruleDay: day.slice(0,2).toUpperCase()\n}}];"
+        },
+        "id": "7693f7df-bd21-40e9-b949-9df92bab62db",
+        "name": "Build New Team Event Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2336,
+          1040
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Get Meeting for Team').item.json.results[0].google_calendar_id) }}/events?sendUpdates=all",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"summary\": {{ JSON.stringify($json.summary) }},\n  \"location\": {{ JSON.stringify($json.meetingLink) }},\n  \"start\": { \"dateTime\": \"{{ $json.startISO }}\", \"timeZone\": \"{{ $json.timeZone }}\" },\n  \"end\": { \"dateTime\": \"{{ $json.endISO }}\", \"timeZone\": \"{{ $json.timeZone }}\" },\n  \"recurrence\": [\"RRULE:FREQ=WEEKLY;BYDAY={{ $json.rruleDay }}\"],\n  \"reminders\": { \"useDefault\": true }\n}",
+          "options": {}
+        },
+        "id": "fc61b4d6-7eea-40a9-b8bd-8d935b169e14",
+        "name": "Create New Calendar Event (Team Change)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2560,
+          1040
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $('Get Meeting for Team').item.json.results[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"field_6978\": \"{{ $json.id }}\"}",
+          "options": {}
+        },
+        "id": "d63d1c1a-04d4-40f4-8130-bde963ffa164",
+        "name": "Update MEETING Calendar ID",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2784,
+          1040
+        ]
+      }
+    ],
+    "connections": {
+      "Incoming: Proposed Change": {
+        "main": [
+          [
+            {
+              "node": "Parse Change ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Change ID": {
+        "main": [
+          [
+            {
+              "node": "Fetch Change (Incoming)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Change (Incoming)": {
+        "main": [
+          [
+            {
+              "node": "Set Pending Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build & Send Approval Email": {
+        "main": [
+          [
+            {
+              "node": "Email Admin (Approval Request)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Approve: Callback": {
+        "main": [
+          [
+            {
+              "node": "Fetch Change (Approve Preview)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Change (Approve)": {
+        "main": [
+          [
+            {
+              "node": "Mark Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark Approved": {
+        "main": [
+          [
+            {
+              "node": "Branch on Change Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Branch on Change Type": {
+        "main": [
+          [
+            {
+              "node": "Apply: Cancel Instance",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Apply: Set End Date",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Apply: Substitution",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Apply: Reschedule",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply: Cancel Instance": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting (Cancel)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply: Set End Date": {
+        "main": [
+          [
+            {
+              "node": "Get Team Member Details",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply: Substitution": {
+        "main": [
+          [
+            {
+              "node": "Assign Substitute Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply: Reschedule": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting (Reschedule)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Proposer: Approved": {
+        "main": [
+          [
+            {
+              "node": "Respond: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reject: Callback": {
+        "main": [
+          [
+            {
+              "node": "Fetch Change (Reject Preview)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Change (Reject)": {
+        "main": [
+          [
+            {
+              "node": "Mark Rejected",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark Rejected": {
+        "main": [
+          [
+            {
+              "node": "Notify Proposer: Rejected",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Proposer: Rejected": {
+        "main": [
+          [
+            {
+              "node": "Respond: Rejected",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Pending Status": {
+        "main": [
+          [
+            {
+              "node": "Fetch Active Volunteers",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Active Volunteers": {
+        "main": [
+          [
+            {
+              "node": "Build & Send Approval Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Assign Substitute Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Get Instance (Sub)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Change (Approve Preview)": {
+        "main": [
+          [
+            {
+              "node": "Build Approve Confirmation Page",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Approve Confirmation Page": {
+        "main": [
+          [
+            {
+              "node": "Respond: Show Approve Form",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Approve: Confirm": {
+        "main": [
+          [
+            {
+              "node": "Verify Approve PIN",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Approve PIN": {
+        "main": [
+          [
+            {
+              "node": "Fetch Change (Approve)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Change (Reject Preview)": {
+        "main": [
+          [
+            {
+              "node": "Build Reject Confirmation Page",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Reject Confirmation Page": {
+        "main": [
+          [
+            {
+              "node": "Respond: Show Reject Form",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reject: Confirm": {
+        "main": [
+          [
+            {
+              "node": "Verify Reject PIN",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Reject PIN": {
+        "main": [
+          [
+            {
+              "node": "Fetch Change (Reject)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting (Cancel)": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Instance (Cancel)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Instance (Cancel)": {
+        "main": [
+          [
+            {
+              "node": "Delete Calendar Occurrence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Calendar Occurrence": {
+        "main": [
+          [
+            {
+              "node": "Notify Proposer: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting (Reschedule)": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Instance (Reschedule)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Instance (Reschedule)": {
+        "main": [
+          [
+            {
+              "node": "Build Reschedule Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Reschedule Payload": {
+        "main": [
+          [
+            {
+              "node": "Update Calendar Occurrence (Reschedule)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Calendar Occurrence (Reschedule)": {
+        "main": [
+          [
+            {
+              "node": "Notify Proposer: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Instance (Sub)": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting (Sub)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting (Sub)": {
+        "main": [
+          [
+            {
+              "node": "Get Sub Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Sub Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Get Sub Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Sub Person": {
+        "main": [
+          [
+            {
+              "node": "Build Sub Calendar Patch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Sub Calendar Patch": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Instance (Sub)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Instance (Sub)": {
+        "main": [
+          [
+            {
+              "node": "Patch Calendar Occurrence (Sub)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Patch Calendar Occurrence (Sub)": {
+        "main": [
+          [
+            {
+              "node": "Email Substitute Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Substitute Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Notify Proposer: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Team Member Details": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting for Team",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting for Team": {
+        "main": [
+          [
+            {
+              "node": "Delete Old Calendar Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Old Calendar Event": {
+        "main": [
+          [
+            {
+              "node": "Get Active Members (Team Change)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Members (Team Change)": {
+        "main": [
+          [
+            {
+              "node": "Build New Team Event Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build New Team Event Payload": {
+        "main": [
+          [
+            {
+              "node": "Create New Calendar Event (Team Change)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create New Calendar Event (Team Change)": {
+        "main": [
+          [
+            {
+              "node": "Update MEETING Calendar ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update MEETING Calendar ID": {
+        "main": [
+          [
+            {
+              "node": "Notify Proposer: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version c20b2194",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:35:57.966Z",
+        "id": 193,
+        "workflowId": "ZWb7c4a4TOtLuSHL",
+        "versionId": "c20b2194-2643-496d-86cf-d6a4d1a2c147",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

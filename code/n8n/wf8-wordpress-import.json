@@ -1,0 +1,907 @@
+{
+  "updatedAt": "2026-03-21T18:42:05.674Z",
+  "createdAt": "2026-03-21T18:41:33.503Z",
+  "id": "DTvxdO1ystCpWwvY",
+  "name": "WF8 \u2014 WordPress Import (Volunteer / Senior)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf8-wordpress-import",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "9de09a47-b246-4d1c-8cc8-65246133b463"
+    },
+    {
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Accept either direct POST body or wrapped in body/data\nconst raw = $input.first().json;\nconst src = raw.body || raw.data || raw;\n\n// Normalize field names \u2014 WordPress forms use various key formats\nconst firstName    = src.first_name   || src.firstName   || src['First Name']   || '';\nconst lastName     = src.last_name    || src.lastName    || src['Last Name']    || '';\nconst email        = src.email        || src.Email        || '';\nconst role         = (src.role        || src.Role        || src.type || 'volunteer').toLowerCase();\nconst school       = src.school       || src.School       || '';\nconst schoolCity   = src.school_city  || src.schoolCity  || src['School City']  || '';\nconst schoolState  = src.school_state || src.schoolState || src['School State'] || '';\nconst gradYear     = parseInt(src.graduation_year || src.graduationYear || src['Graduation Year'] || '0') || null;\nconst birthDate    = src.birth_date   || src.birthDate   || src['Birth Date']   || null;\nconst phone        = src.phone        || src.Phone        || src.phone_number   || '';\nconst city         = src.city         || src.City         || '';\nconst state        = src.state        || src.State        || '';\nconst ageRange     = src.age_range    || src.ageRange    || '';\nconst veteranStatus = !!(src.veteran_status || src.veteranStatus || src['Veteran Status']);\nconst communityId  = parseInt(src.community_id || src.communityId || '0') || null;\nconst notes        = src.notes        || src.Notes        || '';\nconst timezone     = src.timezone     || 'America/New_York';\n\nif (!email) throw new Error('Missing required field: email');\nif (!firstName || !lastName) throw new Error('Missing required fields: first_name / last_name');\n\nreturn [{ json: { firstName, lastName, email, role, school, schoolCity, schoolState, gradYear, birthDate, phone, city, state, ageRange, veteranStatus, communityId, notes, timezone } }];"
+      },
+      "id": "2e2afa96-a23b-4573-a77c-18999ce28423"
+    },
+    {
+      "name": "Check Person Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&filter__email__equal={{ encodeURIComponent($json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5f942bf1-f028-4e06-94d1-fabc8bc3cd8d"
+    },
+    {
+      "name": "Person Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "72a915ff-deda-4667-bfb7-06ff70fd0c74"
+    },
+    {
+      "name": "Get Existing Person",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        180
+      ],
+      "parameters": {
+        "jsCode": "// Person already exists \u2014 return their ID and the normalized payload\nconst personId = $json.results[0].id;\nconst norm = $('Normalize Payload').item.json;\nreturn [{ json: { personId, ...norm, action: 'existing' } }];"
+      },
+      "id": "b9c9a28e-70bd-45d0-90bc-21afd6471f0b"
+    },
+    {
+      "name": "Create Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        960,
+        420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"first_name\": {{ JSON.stringify($('Normalize Payload').item.json.firstName) }},\n  \"last_name\": {{ JSON.stringify($('Normalize Payload').item.json.lastName) }},\n  \"email\": {{ JSON.stringify($('Normalize Payload').item.json.email) }},\n  \"role\": {{ JSON.stringify($('Normalize Payload').item.json.role) }},\n  \"city\": {{ JSON.stringify($('Normalize Payload').item.json.city) }},\n  \"state\": {{ JSON.stringify($('Normalize Payload').item.json.state) }},\n  \"timezone\": {{ JSON.stringify($('Normalize Payload').item.json.timezone) }},\n  \"status\": \"active\"\n}",
+        "options": {}
+      },
+      "id": "3435d9d4-5890-4456-b736-f4ad345f32c7"
+    },
+    {
+      "name": "Merge Person ID",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "mode": "chooseBranch",
+        "chooseBranch": {
+          "mode": "waitForAll"
+        },
+        "options": {}
+      },
+      "id": "64e4d7b5-85e2-4d64-8f4f-5df5b1edb102"
+    },
+    {
+      "name": "Branch on Role",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.role }}",
+                    "rightValue": "volunteer",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "volunteer"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.role }}",
+                    "rightValue": "senior",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "senior"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e8cacfd-e211-4c2f-b121-140feafa921a"
+    },
+    {
+      "name": "Create Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"person\": [{{ $json.personId || $json.id }}],\n  \"school\": {{ JSON.stringify($json.school || '') }},\n  \"school_city\": {{ JSON.stringify($json.schoolCity || '') }},\n  \"school_state\": {{ JSON.stringify($json.schoolState || '') }},\n  \"graduation_year\": {{ JSON.stringify($json.gradYear) }},\n  \"birth_date\": {{ JSON.stringify($json.birthDate) }},\n  \"status\": \"pending\",\n  \"onboarding_date\": {{ JSON.stringify(new Date().toISOString().split('T')[0]) }}\n}",
+        "options": {}
+      },
+      "id": "35143d54-9372-4927-a181-5c29bb93d56b"
+    },
+    {
+      "name": "Create Senior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        360
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"person\": [{{ $json.personId || $json.id }}],\n  \"age_range\": {{ JSON.stringify($json.ageRange || '') }},\n  \"veteran_status\": {{ $json.veteranStatus ? 'true' : 'false' }},\n  \"notes\": {{ JSON.stringify($json.notes || '') }},\n  \"onboarding_date\": {{ JSON.stringify(new Date().toISOString().split('T')[0]) }}\n}",
+        "options": {}
+      },
+      "id": "d0c33ca4-d5fb-44a7-9c1a-21e6bf8b33a4"
+    },
+    {
+      "name": "Unknown Role",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        560
+      ],
+      "parameters": {},
+      "id": "a82a31c4-7d8d-438d-b528-b8f9fdbf4023"
+    },
+    {
+      "name": "Notify Director",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        260
+      ],
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "=CTR: New {{ $('Normalize Payload').item.json.role }} imported from WordPress",
+        "html": "=<p>A new record was imported from WordPress.</p><p><strong>Name:</strong> {{ $('Normalize Payload').item.json.firstName }} {{ $('Normalize Payload').item.json.lastName }}<br><strong>Email:</strong> {{ $('Normalize Payload').item.json.email }}<br><strong>Role:</strong> {{ $('Normalize Payload').item.json.role }}<br><strong>Action:</strong> {{ $json.action === 'existing' ? 'Linked to existing PERSON record' : 'New PERSON record created' }}</p><p>Please review in Baserow and assign to a team if applicable.</p>",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      },
+      "id": "e472a7d3-ac79-40e8-9702-257b3a2a4b05"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Check Person Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Person Exists": {
+      "main": [
+        [
+          {
+            "node": "Person Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Person Exists?": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Person",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Person": {
+      "main": [
+        [
+          {
+            "node": "Merge Person ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Person": {
+      "main": [
+        [
+          {
+            "node": "Merge Person ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Person ID": {
+      "main": [
+        [
+          {
+            "node": "Branch on Role",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch on Role": {
+      "main": [
+        [
+          {
+            "node": "Create Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Senior",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Role",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Notify Director",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Senior": {
+      "main": [
+        [
+          {
+            "node": "Notify Director",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "100a0acf-bb9d-4c4d-81cf-008332bcbac3",
+  "activeVersionId": "100a0acf-bb9d-4c4d-81cf-008332bcbac3",
+  "versionCounter": 4,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T18:41:33.505Z",
+      "createdAt": "2026-03-21T18:41:33.505Z",
+      "role": "workflow:owner",
+      "workflowId": "DTvxdO1ystCpWwvY",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:42:05.676Z",
+    "createdAt": "2026-03-21T18:42:05.676Z",
+    "versionId": "100a0acf-bb9d-4c4d-81cf-008332bcbac3",
+    "workflowId": "DTvxdO1ystCpWwvY",
+    "nodes": [
+      {
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          300
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf8-wordpress-import",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "9de09a47-b246-4d1c-8cc8-65246133b463"
+      },
+      {
+        "name": "Normalize Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Accept either direct POST body or wrapped in body/data\nconst raw = $input.first().json;\nconst src = raw.body || raw.data || raw;\n\n// Normalize field names \u2014 WordPress forms use various key formats\nconst firstName    = src.first_name   || src.firstName   || src['First Name']   || '';\nconst lastName     = src.last_name    || src.lastName    || src['Last Name']    || '';\nconst email        = src.email        || src.Email        || '';\nconst role         = (src.role        || src.Role        || src.type || 'volunteer').toLowerCase();\nconst school       = src.school       || src.School       || '';\nconst schoolCity   = src.school_city  || src.schoolCity  || src['School City']  || '';\nconst schoolState  = src.school_state || src.schoolState || src['School State'] || '';\nconst gradYear     = parseInt(src.graduation_year || src.graduationYear || src['Graduation Year'] || '0') || null;\nconst birthDate    = src.birth_date   || src.birthDate   || src['Birth Date']   || null;\nconst phone        = src.phone        || src.Phone        || src.phone_number   || '';\nconst city         = src.city         || src.City         || '';\nconst state        = src.state        || src.State        || '';\nconst ageRange     = src.age_range    || src.ageRange    || '';\nconst veteranStatus = !!(src.veteran_status || src.veteranStatus || src['Veteran Status']);\nconst communityId  = parseInt(src.community_id || src.communityId || '0') || null;\nconst notes        = src.notes        || src.Notes        || '';\nconst timezone     = src.timezone     || 'America/New_York';\n\nif (!email) throw new Error('Missing required field: email');\nif (!firstName || !lastName) throw new Error('Missing required fields: first_name / last_name');\n\nreturn [{ json: { firstName, lastName, email, role, school, schoolCity, schoolState, gradYear, birthDate, phone, city, state, ageRange, veteranStatus, communityId, notes, timezone } }];"
+        },
+        "id": "2e2afa96-a23b-4573-a77c-18999ce28423"
+      },
+      {
+        "name": "Check Person Exists",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          480,
+          300
+        ],
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true&filter__email__equal={{ encodeURIComponent($json.email) }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "5f942bf1-f028-4e06-94d1-fabc8bc3cd8d"
+      },
+      {
+        "name": "Person Exists?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          720,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond1",
+                "leftValue": "={{ $json.count }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        },
+        "id": "72a915ff-deda-4667-bfb7-06ff70fd0c74"
+      },
+      {
+        "name": "Get Existing Person",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          960,
+          180
+        ],
+        "parameters": {
+          "jsCode": "// Person already exists \u2014 return their ID and the normalized payload\nconst personId = $json.results[0].id;\nconst norm = $('Normalize Payload').item.json;\nreturn [{ json: { personId, ...norm, action: 'existing' } }];"
+        },
+        "id": "b9c9a28e-70bd-45d0-90bc-21afd6471f0b"
+      },
+      {
+        "name": "Create Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          960,
+          420
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/556/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"first_name\": {{ JSON.stringify($('Normalize Payload').item.json.firstName) }},\n  \"last_name\": {{ JSON.stringify($('Normalize Payload').item.json.lastName) }},\n  \"email\": {{ JSON.stringify($('Normalize Payload').item.json.email) }},\n  \"role\": {{ JSON.stringify($('Normalize Payload').item.json.role) }},\n  \"city\": {{ JSON.stringify($('Normalize Payload').item.json.city) }},\n  \"state\": {{ JSON.stringify($('Normalize Payload').item.json.state) }},\n  \"timezone\": {{ JSON.stringify($('Normalize Payload').item.json.timezone) }},\n  \"status\": \"active\"\n}",
+          "options": {}
+        },
+        "id": "3435d9d4-5890-4456-b736-f4ad345f32c7"
+      },
+      {
+        "name": "Merge Person ID",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3,
+        "position": [
+          1200,
+          300
+        ],
+        "parameters": {
+          "mode": "chooseBranch",
+          "chooseBranch": {
+            "mode": "waitForAll"
+          },
+          "options": {}
+        },
+        "id": "64e4d7b5-85e2-4d64-8f4f-5df5b1edb102"
+      },
+      {
+        "name": "Branch on Role",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          1440,
+          300
+        ],
+        "parameters": {
+          "mode": "rules",
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false
+                  },
+                  "conditions": [
+                    {
+                      "id": "r1",
+                      "leftValue": "={{ $json.role }}",
+                      "rightValue": "volunteer",
+                      "operator": {
+                        "type": "string",
+                        "operation": "contains"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "volunteer"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false
+                  },
+                  "conditions": [
+                    {
+                      "id": "r2",
+                      "leftValue": "={{ $json.role }}",
+                      "rightValue": "senior",
+                      "operator": {
+                        "type": "string",
+                        "operation": "contains"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "senior"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "8e8cacfd-e211-4c2f-b121-140feafa921a"
+      },
+      {
+        "name": "Create Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1680,
+          160
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/561/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"person\": [{{ $json.personId || $json.id }}],\n  \"school\": {{ JSON.stringify($json.school || '') }},\n  \"school_city\": {{ JSON.stringify($json.schoolCity || '') }},\n  \"school_state\": {{ JSON.stringify($json.schoolState || '') }},\n  \"graduation_year\": {{ JSON.stringify($json.gradYear) }},\n  \"birth_date\": {{ JSON.stringify($json.birthDate) }},\n  \"status\": \"pending\",\n  \"onboarding_date\": {{ JSON.stringify(new Date().toISOString().split('T')[0]) }}\n}",
+          "options": {}
+        },
+        "id": "35143d54-9372-4927-a181-5c29bb93d56b"
+      },
+      {
+        "name": "Create Senior",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1680,
+          360
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"person\": [{{ $json.personId || $json.id }}],\n  \"age_range\": {{ JSON.stringify($json.ageRange || '') }},\n  \"veteran_status\": {{ $json.veteranStatus ? 'true' : 'false' }},\n  \"notes\": {{ JSON.stringify($json.notes || '') }},\n  \"onboarding_date\": {{ JSON.stringify(new Date().toISOString().split('T')[0]) }}\n}",
+          "options": {}
+        },
+        "id": "d0c33ca4-d5fb-44a7-9c1a-21e6bf8b33a4"
+      },
+      {
+        "name": "Unknown Role",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1680,
+          560
+        ],
+        "parameters": {},
+        "id": "a82a31c4-7d8d-438d-b528-b8f9fdbf4023"
+      },
+      {
+        "name": "Notify Director",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          1920,
+          260
+        ],
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "=CTR: New {{ $('Normalize Payload').item.json.role }} imported from WordPress",
+          "html": "=<p>A new record was imported from WordPress.</p><p><strong>Name:</strong> {{ $('Normalize Payload').item.json.firstName }} {{ $('Normalize Payload').item.json.lastName }}<br><strong>Email:</strong> {{ $('Normalize Payload').item.json.email }}<br><strong>Role:</strong> {{ $('Normalize Payload').item.json.role }}<br><strong>Action:</strong> {{ $json.action === 'existing' ? 'Linked to existing PERSON record' : 'New PERSON record created' }}</p><p>Please review in Baserow and assign to a team if applicable.</p>",
+          "options": {}
+        },
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        },
+        "id": "e472a7d3-ac79-40e8-9702-257b3a2a4b05"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Payload": {
+        "main": [
+          [
+            {
+              "node": "Check Person Exists",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Person Exists": {
+        "main": [
+          [
+            {
+              "node": "Person Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Person Exists?": {
+        "main": [
+          [
+            {
+              "node": "Get Existing Person",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Existing Person": {
+        "main": [
+          [
+            {
+              "node": "Merge Person ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Person": {
+        "main": [
+          [
+            {
+              "node": "Merge Person ID",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Merge Person ID": {
+        "main": [
+          [
+            {
+              "node": "Branch on Role",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Branch on Role": {
+        "main": [
+          [
+            {
+              "node": "Create Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create Senior",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Unknown Role",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Notify Director",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Senior": {
+        "main": [
+          [
+            {
+              "node": "Notify Director",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:42:12.243Z",
+        "id": 203,
+        "workflowId": "DTvxdO1ystCpWwvY",
+        "versionId": "100a0acf-bb9d-4c4d-81cf-008332bcbac3",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

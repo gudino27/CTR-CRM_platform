@@ -1,0 +1,667 @@
+{
+  "updatedAt": "2026-03-21T18:26:39.307Z",
+  "createdAt": "2026-03-21T06:39:11.844Z",
+  "id": "7UILTcCuPbI0a5pQ",
+  "name": "WF6 \u2014 Pre-meeting Reminder (Daily Cron)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"instance_date\",\"type\":\"date_equal\",\"value\":\"{{ $now.toFormat('yyyy-MM-dd') }}\"},{\"field\":\"instance_status\",\"type\":\"single_select_equal\",\"value\":\"scheduled\"}]}&size=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n2",
+      "name": "Get Today's Instances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst results = response.results || [];\nconst items = [];\nfor (const inst of results) {\n  const meetingArr = inst.meeting || [];\n  const meeting_id = meetingArr.length > 0 ? meetingArr[0].id : null;\n  if (meeting_id) {\n    items.push({ json: {\n      instance_id: inst.id,\n      meeting_id: meeting_id,\n      instance_date: inst.instance_date,\n      instance_start: inst.instance_start,\n      instance_end: inst.instance_end,\n    }});\n  }\n}\nreturn items;"
+      },
+      "id": "n3",
+      "name": "Extract Instances",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n4",
+      "name": "Get Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting_instance\",\"type\":\"link_row_has\",\"value\":\"{{ $('Extract Instances').item.json.instance_id }}\"},{\"field\":\"attendance_status\",\"type\":\"single_select_equal\",\"value\":\"expected\"}]}&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n5",
+      "name": "Get Attendances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst attendanceResponses = $input.all();\nconst meetings = $('Get Meeting').all();\nconst instances = $('Extract Instances').all();\n\nfor (let i = 0; i < attendanceResponses.length; i++) {\n  const meeting = meetings[i]?.json || {};\n  const instance = instances[i]?.json || {};\n  const attendances = attendanceResponses[i].json.results || [];\n\n  for (const att of attendances) {\n    const volunteerArr = att.volunteer || [];\n    for (const vol of volunteerArr) {\n      results.push({ json: {\n        volunteer_id: vol.id,\n        volunteer_name: vol.value,\n        instance_id: instance.instance_id,\n        instance_date: instance.instance_date,\n        instance_start: instance.instance_start,\n        meeting_link: meeting.meeting_link || '',\n      }});\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "n6",
+      "name": "Split Attendees",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n7",
+      "name": "Get Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person?.[0]?.id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n8",
+      "name": "Get Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst personResponses = $input.all();\nconst ctxItems = $('Split Attendees').all();\n\nfor (let i = 0; i < personResponses.length; i++) {\n  const person = personResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  const startTime = ctx.instance_start || '';\n  let timeDisplay = startTime;\n  try {\n    const d = new Date(startTime);\n    timeDisplay = d.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', timeZone: 'UTC'});\n  } catch(e) {}\n\n  results.push({\n    json: {\n      to: person.email,\n      first_name: person.first_name || ctx.volunteer_name,\n      volunteer_name: ctx.volunteer_name,\n      instance_date: ctx.instance_date,\n      time_display: timeDisplay,\n      meeting_link: ctx.meeting_link,\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "n9",
+      "name": "Build Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $json.to }}",
+        "subject": "=Your CTR Visit is Today \u2014 {{ $json.instance_date }}",
+        "html": "=<p>Hi {{ $json.first_name }},</p><p>This is a friendly reminder that you have a CTR visit scheduled for <strong>{{ $json.instance_date }}</strong> at <strong>{{ $json.time_display }} UTC</strong>.</p><p><a href=\"{{ $json.meeting_link }}\">Click here to join the meeting</a></p><p>Thank you for volunteering with Conversations to Remember!</p>",
+        "options": {}
+      },
+      "id": "n10",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2224,
+        304
+      ],
+      "webhookId": "d89a49d8-ab73-495a-ba7b-64679afdd14a",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Today's Instances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Today's Instances": {
+      "main": [
+        [
+          {
+            "node": "Extract Instances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Instances": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting": {
+      "main": [
+        [
+          {
+            "node": "Get Attendances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attendances": {
+      "main": [
+        [
+          {
+            "node": "Split Attendees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Attendees": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Get Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Person": {
+      "main": [
+        [
+          {
+            "node": "Build Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 300,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "09fb6d47-8bb8-461d-a1e0-4843e5ad95a8",
+  "activeVersionId": "09fb6d47-8bb8-461d-a1e0-4843e5ad95a8",
+  "versionCounter": 15,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T06:39:11.846Z",
+      "createdAt": "2026-03-21T06:39:11.846Z",
+      "role": "workflow:owner",
+      "workflowId": "7UILTcCuPbI0a5pQ",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:26:43.000Z",
+    "createdAt": "2026-03-21T18:26:39.307Z",
+    "versionId": "09fb6d47-8bb8-461d-a1e0-4843e5ad95a8",
+    "workflowId": "7UILTcCuPbI0a5pQ",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 8
+              }
+            ]
+          }
+        },
+        "id": "n1",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          208,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"instance_date\",\"type\":\"date_equal\",\"value\":\"{{ $now.toFormat('yyyy-MM-dd') }}\"},{\"field\":\"instance_status\",\"type\":\"single_select_equal\",\"value\":\"scheduled\"}]}&size=100",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n2",
+        "name": "Get Today's Instances",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          432,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst results = response.results || [];\nconst items = [];\nfor (const inst of results) {\n  const meetingArr = inst.meeting || [];\n  const meeting_id = meetingArr.length > 0 ? meetingArr[0].id : null;\n  if (meeting_id) {\n    items.push({ json: {\n      instance_id: inst.id,\n      meeting_id: meeting_id,\n      instance_date: inst.instance_date,\n      instance_start: inst.instance_start,\n      instance_end: inst.instance_end,\n    }});\n  }\n}\nreturn items;"
+        },
+        "id": "n3",
+        "name": "Extract Instances",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          656,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n4",
+        "name": "Get Meeting",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          880,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting_instance\",\"type\":\"link_row_has\",\"value\":\"{{ $('Extract Instances').item.json.instance_id }}\"},{\"field\":\"attendance_status\",\"type\":\"single_select_equal\",\"value\":\"expected\"}]}&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n5",
+        "name": "Get Attendances",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1104,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst attendanceResponses = $input.all();\nconst meetings = $('Get Meeting').all();\nconst instances = $('Extract Instances').all();\n\nfor (let i = 0; i < attendanceResponses.length; i++) {\n  const meeting = meetings[i]?.json || {};\n  const instance = instances[i]?.json || {};\n  const attendances = attendanceResponses[i].json.results || [];\n\n  for (const att of attendances) {\n    const volunteerArr = att.volunteer || [];\n    for (const vol of volunteerArr) {\n      results.push({ json: {\n        volunteer_id: vol.id,\n        volunteer_name: vol.value,\n        instance_id: instance.instance_id,\n        instance_date: instance.instance_date,\n        instance_start: instance.instance_start,\n        meeting_link: meeting.meeting_link || '',\n      }});\n    }\n  }\n}\nreturn results;"
+        },
+        "id": "n6",
+        "name": "Split Attendees",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1328,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n7",
+        "name": "Get Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1552,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person?.[0]?.id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n8",
+        "name": "Get Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1776,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst personResponses = $input.all();\nconst ctxItems = $('Split Attendees').all();\n\nfor (let i = 0; i < personResponses.length; i++) {\n  const person = personResponses[i].json;\n  const ctx = ctxItems[i]?.json || {};\n  const startTime = ctx.instance_start || '';\n  let timeDisplay = startTime;\n  try {\n    const d = new Date(startTime);\n    timeDisplay = d.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', timeZone: 'UTC'});\n  } catch(e) {}\n\n  results.push({\n    json: {\n      to: person.email,\n      first_name: person.first_name || ctx.volunteer_name,\n      volunteer_name: ctx.volunteer_name,\n      instance_date: ctx.instance_date,\n      time_display: timeDisplay,\n      meeting_link: ctx.meeting_link,\n    }\n  });\n}\nreturn results;"
+        },
+        "id": "n9",
+        "name": "Build Email Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2000,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $json.to }}",
+          "subject": "=Your CTR Visit is Today \u2014 {{ $json.instance_date }}",
+          "html": "=<p>Hi {{ $json.first_name }},</p><p>This is a friendly reminder that you have a CTR visit scheduled for <strong>{{ $json.instance_date }}</strong> at <strong>{{ $json.time_display }} UTC</strong>.</p><p><a href=\"{{ $json.meeting_link }}\">Click here to join the meeting</a></p><p>Thank you for volunteering with Conversations to Remember!</p>",
+          "options": {}
+        },
+        "id": "n10",
+        "name": "Send Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          2224,
+          304
+        ],
+        "webhookId": "d89a49d8-ab73-495a-ba7b-64679afdd14a",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Today's Instances",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Today's Instances": {
+        "main": [
+          [
+            {
+              "node": "Extract Instances",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Instances": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting": {
+        "main": [
+          [
+            {
+              "node": "Get Attendances",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Attendances": {
+        "main": [
+          [
+            {
+              "node": "Split Attendees",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Attendees": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Get Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Person": {
+        "main": [
+          [
+            {
+              "node": "Build Email Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Email Data": {
+        "main": [
+          [
+            {
+              "node": "Send Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version 09fb6d47",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:26:43.286Z",
+        "id": 181,
+        "workflowId": "7UILTcCuPbI0a5pQ",
+        "versionId": "09fb6d47-8bb8-461d-a1e0-4843e5ad95a8",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

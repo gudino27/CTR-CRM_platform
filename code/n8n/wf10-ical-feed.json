@@ -1,0 +1,343 @@
+{
+  "updatedAt": "2026-03-21T18:41:45.743Z",
+  "createdAt": "2026-03-19T04:26:16.909Z",
+  "id": "9tZQFBKop1Gq1Ezu",
+  "name": "WF10 - iCal Feed",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ctr-ical",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf10-0001",
+      "name": "Webhook: iCal Feed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "webhookId": "aa4df9bc-b32f-429b-a2f2-c89b2d92eae3"
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&filter__field_5253__link_row_has={{ $json.query.vol }}&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf10-0002",
+      "name": "Get Volunteer Attendance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst results = data.results || [];\nreturn results.map(r => ({ json: r }));"
+      },
+      "id": "wf10-0003",
+      "name": "Split Attendance Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst volId = $('Webhook: iCal Feed').first().json.query?.vol;\nif (!volId) {\n  return [{ json: { ics: 'ERROR:MISSING_VOL_PARAM' }}];\n}\n\nconst records = $input.all();\nconst now = new Date();\nconst stamp = now.toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';\n\n// Helper: extract value from lookup field (object {id, value} or plain string)\nconst val = (field) => {\n  if (!field) return null;\n  const v = Array.isArray(field) ? field[0] : field;\n  return (v && typeof v === 'object') ? v.value : v;\n};\n\n// Convert ISO datetime string to iCal format: 20260318T143000\nconst toIcal = (dt) => {\n  if (!dt) return null;\n  return dt.replace(/[-:]/g,'').replace('+00:00','').replace('.000','').slice(0,15);\n};\n\nconst lines = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//CTR-CRM//Conversations to Remember//EN',\n  'CALSCALE:GREGORIAN',\n  'METHOD:PUBLISH',\n  'X-WR-CALNAME:My CTR-CRM Schedule',\n  'X-WR-TIMEZONE:America/Los_Angeles',\n];\n\nfor (const item of records) {\n  const row = item.json;\n  if (!row || !row.id) continue;\n\n  const status = (row.attendance_status && typeof row.attendance_status === 'object')\n    ? row.attendance_status.value\n    : row.attendance_status || '';\n  if (status === 'cancelled') continue;\n\n  const rawStart = val(row.instance_start);\n  const rawEnd   = val(row.instance_end);\n  const rawDate  = val(row.instance_date);\n\n  if (!rawStart) continue;\n\n  const dtStart = toIcal(rawStart);\n  const dtEnd   = toIcal(rawEnd) || dtStart;\n\n  const volName = (row.volunteer && row.volunteer[0]) ? row.volunteer[0].value : 'Volunteer';\n  const summary = 'CTR-CRM Visit' + (rawDate ? ' - ' + rawDate.slice(0,10) : '');\n  const desc    = 'Volunteer: ' + volName + ' | Status: ' + status;\n\n  lines.push('BEGIN:VEVENT');\n  lines.push('DTSTART:' + dtStart);\n  lines.push('DTEND:' + dtEnd);\n  lines.push('SUMMARY:' + summary);\n  lines.push('DESCRIPTION:' + desc);\n  lines.push('UID:attendance-' + row.id + '@ctr-crm');\n  lines.push('DTSTAMP:' + stamp);\n  lines.push('END:VEVENT');\n}\n\nlines.push('END:VCALENDAR');\nreturn [{ json: { ics: lines.join('\\r\\n') }}];\n"
+      },
+      "id": "wf10-0004",
+      "name": "Build iCal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.ics }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/calendar; charset=utf-8"
+              },
+              {
+                "name": "Content-Disposition",
+                "value": "attachment; filename=ctr-crm-schedule.ics"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf10-0005",
+      "name": "Respond with iCal",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: iCal Feed": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer Attendance": {
+      "main": [
+        [
+          {
+            "node": "Split Attendance Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Attendance Records": {
+      "main": [
+        [
+          {
+            "node": "Build iCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build iCal": {
+      "main": [
+        [
+          {
+            "node": "Respond with iCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "318b8971-6aec-4d54-845e-e7ca65275d6f",
+  "activeVersionId": "318b8971-6aec-4d54-845e-e7ca65275d6f",
+  "versionCounter": 16,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-19T04:26:16.911Z",
+      "createdAt": "2026-03-19T04:26:16.911Z",
+      "role": "workflow:owner",
+      "workflowId": "9tZQFBKop1Gq1Ezu",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:41:46.000Z",
+    "createdAt": "2026-03-21T18:41:45.743Z",
+    "versionId": "318b8971-6aec-4d54-845e-e7ca65275d6f",
+    "workflowId": "9tZQFBKop1Gq1Ezu",
+    "nodes": [
+      {
+        "parameters": {
+          "path": "ctr-ical",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wf10-0001",
+        "name": "Webhook: iCal Feed",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          304
+        ],
+        "webhookId": "aa4df9bc-b32f-429b-a2f2-c89b2d92eae3"
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true&filter__field_5253__link_row_has={{ $json.query.vol }}&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "wf10-0002",
+        "name": "Get Volunteer Attendance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          464,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nconst results = data.results || [];\nreturn results.map(r => ({ json: r }));"
+        },
+        "id": "wf10-0003",
+        "name": "Split Attendance Records",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          688,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst volId = $('Webhook: iCal Feed').first().json.query?.vol;\nif (!volId) {\n  return [{ json: { ics: 'ERROR:MISSING_VOL_PARAM' }}];\n}\n\nconst records = $input.all();\nconst now = new Date();\nconst stamp = now.toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';\n\n// Helper: extract value from lookup field (object {id, value} or plain string)\nconst val = (field) => {\n  if (!field) return null;\n  const v = Array.isArray(field) ? field[0] : field;\n  return (v && typeof v === 'object') ? v.value : v;\n};\n\n// Convert ISO datetime string to iCal format: 20260318T143000\nconst toIcal = (dt) => {\n  if (!dt) return null;\n  return dt.replace(/[-:]/g,'').replace('+00:00','').replace('.000','').slice(0,15);\n};\n\nconst lines = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//CTR-CRM//Conversations to Remember//EN',\n  'CALSCALE:GREGORIAN',\n  'METHOD:PUBLISH',\n  'X-WR-CALNAME:My CTR-CRM Schedule',\n  'X-WR-TIMEZONE:America/Los_Angeles',\n];\n\nfor (const item of records) {\n  const row = item.json;\n  if (!row || !row.id) continue;\n\n  const status = (row.attendance_status && typeof row.attendance_status === 'object')\n    ? row.attendance_status.value\n    : row.attendance_status || '';\n  if (status === 'cancelled') continue;\n\n  const rawStart = val(row.instance_start);\n  const rawEnd   = val(row.instance_end);\n  const rawDate  = val(row.instance_date);\n\n  if (!rawStart) continue;\n\n  const dtStart = toIcal(rawStart);\n  const dtEnd   = toIcal(rawEnd) || dtStart;\n\n  const volName = (row.volunteer && row.volunteer[0]) ? row.volunteer[0].value : 'Volunteer';\n  const summary = 'CTR-CRM Visit' + (rawDate ? ' - ' + rawDate.slice(0,10) : '');\n  const desc    = 'Volunteer: ' + volName + ' | Status: ' + status;\n\n  lines.push('BEGIN:VEVENT');\n  lines.push('DTSTART:' + dtStart);\n  lines.push('DTEND:' + dtEnd);\n  lines.push('SUMMARY:' + summary);\n  lines.push('DESCRIPTION:' + desc);\n  lines.push('UID:attendance-' + row.id + '@ctr-crm');\n  lines.push('DTSTAMP:' + stamp);\n  lines.push('END:VEVENT');\n}\n\nlines.push('END:VCALENDAR');\nreturn [{ json: { ics: lines.join('\\r\\n') }}];\n"
+        },
+        "id": "wf10-0004",
+        "name": "Build iCal",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          912,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "={{ $json.ics }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/calendar; charset=utf-8"
+                },
+                {
+                  "name": "Content-Disposition",
+                  "value": "attachment; filename=ctr-crm-schedule.ics"
+                }
+              ]
+            }
+          }
+        },
+        "id": "wf10-0005",
+        "name": "Respond with iCal",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1136,
+          304
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook: iCal Feed": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer Attendance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer Attendance": {
+        "main": [
+          [
+            {
+              "node": "Split Attendance Records",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Attendance Records": {
+        "main": [
+          [
+            {
+              "node": "Build iCal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build iCal": {
+        "main": [
+          [
+            {
+              "node": "Respond with iCal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version 318b8971",
+    "description": "",
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:41:46.790Z",
+        "id": 201,
+        "workflowId": "9tZQFBKop1Gq1Ezu",
+        "versionId": "318b8971-6aec-4d54-845e-e7ca65275d6f",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

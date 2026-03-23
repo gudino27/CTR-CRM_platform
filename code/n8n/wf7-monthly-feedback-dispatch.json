@@ -1,0 +1,1005 @@
+{
+  "updatedAt": "2026-03-21T18:26:28.408Z",
+  "createdAt": "2026-03-21T06:51:46.029Z",
+  "id": "pZ24lHHhSsO8TO7r",
+  "name": "WF7 \u2014 Monthly Feedback Dispatch (1st of Month)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"Active\",\"type\":\"boolean\",\"value\":\"true\"}]}&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n2",
+      "name": "Get Active Seniors",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst seniors = $input.first().json.results || [];\nfor (const s of seniors) {\n  results.push({ json: {\n    senior_id: s.id,\n    senior_name: s.display_name || s.Name || ('Senior #' + s.id),\n  }});\n}\nreturn results;"
+      },
+      "id": "n3",
+      "name": "Extract Seniors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"senior\",\"type\":\"link_row_has\",\"value\":\"{{ $json.senior_id }}\"},{\"field\":\"status\",\"type\":\"single_select_equal\",\"value\":\"active\"}]}&size=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n4a",
+      "name": "Get Volunteer Teams",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst teamResponses = $input.all();\nconst seniors = $('Extract Seniors').all();\nfor (let i = 0; i < teamResponses.length; i++) {\n  const senior = seniors[i]?.json || {};\n  const teams = teamResponses[i].json.results || [];\n  for (const team of teams) {\n    results.push({ json: {\n      team_id: team.id,\n      senior_id: senior.senior_id,\n      senior_name: senior.senior_name,\n    }});\n  }\n}\nreturn results;"
+      },
+      "id": "n5a",
+      "name": "Extract Teams",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"team\",\"type\":\"link_row_has\",\"value\":\"{{ $json.team_id }}\"},{\"field\":\"end_date\",\"type\":\"empty\",\"value\":\"\"}]}&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n6a",
+      "name": "Get Active Members",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst memberResponses = $input.all();\nconst teams = $('Extract Teams').all();\nfor (let i = 0; i < memberResponses.length; i++) {\n  const ctx = teams[i]?.json || {};\n  const members = memberResponses[i].json.results || [];\n  for (const m of members) {\n    const volArr = m.volunteer || [];\n    for (const v of volArr) {\n      results.push({ json: {\n        volunteer_id: v.id,\n        senior_id: ctx.senior_id,\n        senior_name: ctx.senior_name,\n      }});\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "n7a",
+      "name": "Split Members",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n8a",
+      "name": "Get Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n9a",
+      "name": "Get Volunteer Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst persons = $input.all();\nconst members = $('Split Members').all();\nfor (let i = 0; i < persons.length; i++) {\n  const person = persons[i].json;\n  const member = members[i]?.json || {};\n  results.push({ json: {\n    to: person.email,\n    first_name: person.first_name || 'Volunteer',\n    senior_name: member.senior_name,\n    form_url: 'https://baserow.conversationstoremember.org/form/volunteer-monthly-PLACEHOLDER',\n  }});\n}\nreturn results;"
+      },
+      "id": "n10a",
+      "name": "Build Vol Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $json.to }}",
+        "subject": "=Monthly Feedback Form \u2014 {{ $json.senior_name }}",
+        "html": "=<p>Hi {{ $json.first_name }},</p><p>It's time for the monthly feedback form for <strong>{{ $json.senior_name }}</strong>.</p><p><a href=\"{{ $json.form_url }}\">Click here to complete the feedback form</a></p><p>Thank you!<br><em>Conversations to Remember</em></p>",
+        "options": {}
+      },
+      "id": "n11a",
+      "name": "Send Volunteer Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2448,
+        208
+      ],
+      "webhookId": "304647d9-7184-488f-b8b8-efec80ff334b",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/560/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"senior\",\"type\":\"link_row_has\",\"value\":\"{{ $json.senior_id }}\"},{\"field\":\"relationship_type\",\"type\":\"single_select_equal\",\"value\":\"caregiver\"}]}&size=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n4b",
+      "name": "Get Senior Relationships",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst relResponses = $input.all();\nconst seniors = $('Extract Seniors').all();\nfor (let i = 0; i < relResponses.length; i++) {\n  const senior = seniors[i]?.json || {};\n  const rels = relResponses[i].json.results || [];\n  for (const rel of rels) {\n    const personArr = rel.related_person || [];\n    for (const p of personArr) {\n      results.push({ json: {\n        person_id: p.id,\n        senior_name: senior.senior_name,\n      }});\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "n5b",
+      "name": "Split Relationships",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person_id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n6b",
+      "name": "Get Caregiver Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst persons = $input.all();\nconst rels = $('Split Relationships').all();\nfor (let i = 0; i < persons.length; i++) {\n  const person = persons[i].json;\n  const rel = rels[i]?.json || {};\n  results.push({ json: {\n    to: person.email,\n    first_name: person.first_name || 'Caregiver',\n    senior_name: rel.senior_name,\n    form_url: 'https://baserow.conversationstoremember.org/form/caregiver-monthly-PLACEHOLDER',\n  }});\n}\nreturn results;"
+      },
+      "id": "n7b",
+      "name": "Build Care Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $json.to }}",
+        "subject": "=Monthly Check-in \u2014 {{ $json.senior_name }}",
+        "html": "=<p>Hi {{ $json.first_name }},</p><p>We'd appreciate your monthly feedback about <strong>{{ $json.senior_name }}</strong>.</p><p><a href=\"{{ $json.form_url }}\">Click here to complete the caregiver feedback form</a></p><p>Thank you!<br><em>Conversations to Remember</em></p>",
+        "options": {}
+      },
+      "id": "n8b",
+      "name": "Send Caregiver Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        400
+      ],
+      "webhookId": "b970ef74-9c01-40eb-b775-61b94a820502",
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Active Seniors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Seniors": {
+      "main": [
+        [
+          {
+            "node": "Extract Seniors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Seniors": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer Teams",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Senior Relationships",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer Teams": {
+      "main": [
+        [
+          {
+            "node": "Extract Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Teams": {
+      "main": [
+        [
+          {
+            "node": "Get Active Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Members": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Get Volunteer Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Volunteer Person": {
+      "main": [
+        [
+          {
+            "node": "Build Vol Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Vol Email Data": {
+      "main": [
+        [
+          {
+            "node": "Send Volunteer Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Senior Relationships": {
+      "main": [
+        [
+          {
+            "node": "Split Relationships",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Relationships": {
+      "main": [
+        [
+          {
+            "node": "Get Caregiver Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Caregiver Person": {
+      "main": [
+        [
+          {
+            "node": "Build Care Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Care Email Data": {
+      "main": [
+        [
+          {
+            "node": "Send Caregiver Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 600,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "6a707f71-6c80-4843-98a4-1b7635c42a00",
+  "activeVersionId": "6a707f71-6c80-4843-98a4-1b7635c42a00",
+  "versionCounter": 11,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T06:51:46.031Z",
+      "createdAt": "2026-03-21T06:51:46.031Z",
+      "role": "workflow:owner",
+      "workflowId": "pZ24lHHhSsO8TO7r",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:26:30.000Z",
+    "createdAt": "2026-03-21T18:26:28.409Z",
+    "versionId": "6a707f71-6c80-4843-98a4-1b7635c42a00",
+    "workflowId": "pZ24lHHhSsO8TO7r",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 9
+              }
+            ]
+          }
+        },
+        "id": "n1",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          208,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/558/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"Active\",\"type\":\"boolean\",\"value\":\"true\"}]}&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n2",
+        "name": "Get Active Seniors",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          432,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst seniors = $input.first().json.results || [];\nfor (const s of seniors) {\n  results.push({ json: {\n    senior_id: s.id,\n    senior_name: s.display_name || s.Name || ('Senior #' + s.id),\n  }});\n}\nreturn results;"
+        },
+        "id": "n3",
+        "name": "Extract Seniors",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          656,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/563/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"senior\",\"type\":\"link_row_has\",\"value\":\"{{ $json.senior_id }}\"},{\"field\":\"status\",\"type\":\"single_select_equal\",\"value\":\"active\"}]}&size=100",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n4a",
+        "name": "Get Volunteer Teams",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          880,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst teamResponses = $input.all();\nconst seniors = $('Extract Seniors').all();\nfor (let i = 0; i < teamResponses.length; i++) {\n  const senior = seniors[i]?.json || {};\n  const teams = teamResponses[i].json.results || [];\n  for (const team of teams) {\n    results.push({ json: {\n      team_id: team.id,\n      senior_id: senior.senior_id,\n      senior_name: senior.senior_name,\n    }});\n  }\n}\nreturn results;"
+        },
+        "id": "n5a",
+        "name": "Extract Teams",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"team\",\"type\":\"link_row_has\",\"value\":\"{{ $json.team_id }}\"},{\"field\":\"end_date\",\"type\":\"empty\",\"value\":\"\"}]}&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n6a",
+        "name": "Get Active Members",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1328,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst memberResponses = $input.all();\nconst teams = $('Extract Teams').all();\nfor (let i = 0; i < memberResponses.length; i++) {\n  const ctx = teams[i]?.json || {};\n  const members = memberResponses[i].json.results || [];\n  for (const m of members) {\n    const volArr = m.volunteer || [];\n    for (const v of volArr) {\n      results.push({ json: {\n        volunteer_id: v.id,\n        senior_id: ctx.senior_id,\n        senior_name: ctx.senior_name,\n      }});\n    }\n  }\n}\nreturn results;"
+        },
+        "id": "n7a",
+        "name": "Split Members",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1552,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $json.volunteer_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n8a",
+        "name": "Get Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1776,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n9a",
+        "name": "Get Volunteer Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2000,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst persons = $input.all();\nconst members = $('Split Members').all();\nfor (let i = 0; i < persons.length; i++) {\n  const person = persons[i].json;\n  const member = members[i]?.json || {};\n  results.push({ json: {\n    to: person.email,\n    first_name: person.first_name || 'Volunteer',\n    senior_name: member.senior_name,\n    form_url: 'https://baserow.conversationstoremember.org/form/volunteer-monthly-PLACEHOLDER',\n  }});\n}\nreturn results;"
+        },
+        "id": "n10a",
+        "name": "Build Vol Email Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2224,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $json.to }}",
+          "subject": "=Monthly Feedback Form \u2014 {{ $json.senior_name }}",
+          "html": "=<p>Hi {{ $json.first_name }},</p><p>It's time for the monthly feedback form for <strong>{{ $json.senior_name }}</strong>.</p><p><a href=\"{{ $json.form_url }}\">Click here to complete the feedback form</a></p><p>Thank you!<br><em>Conversations to Remember</em></p>",
+          "options": {}
+        },
+        "id": "n11a",
+        "name": "Send Volunteer Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          2448,
+          208
+        ],
+        "webhookId": "304647d9-7184-488f-b8b8-efec80ff334b",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/560/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"senior\",\"type\":\"link_row_has\",\"value\":\"{{ $json.senior_id }}\"},{\"field\":\"relationship_type\",\"type\":\"single_select_equal\",\"value\":\"caregiver\"}]}&size=200",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n4b",
+        "name": "Get Senior Relationships",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          880,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst relResponses = $input.all();\nconst seniors = $('Extract Seniors').all();\nfor (let i = 0; i < relResponses.length; i++) {\n  const senior = seniors[i]?.json || {};\n  const rels = relResponses[i].json.results || [];\n  for (const rel of rels) {\n    const personArr = rel.related_person || [];\n    for (const p of personArr) {\n      results.push({ json: {\n        person_id: p.id,\n        senior_name: senior.senior_name,\n      }});\n    }\n  }\n}\nreturn results;"
+        },
+        "id": "n5b",
+        "name": "Split Relationships",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person_id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "n6b",
+        "name": "Get Caregiver Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1328,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst persons = $input.all();\nconst rels = $('Split Relationships').all();\nfor (let i = 0; i < persons.length; i++) {\n  const person = persons[i].json;\n  const rel = rels[i]?.json || {};\n  results.push({ json: {\n    to: person.email,\n    first_name: person.first_name || 'Caregiver',\n    senior_name: rel.senior_name,\n    form_url: 'https://baserow.conversationstoremember.org/form/caregiver-monthly-PLACEHOLDER',\n  }});\n}\nreturn results;"
+        },
+        "id": "n7b",
+        "name": "Build Care Email Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1552,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $json.to }}",
+          "subject": "=Monthly Check-in \u2014 {{ $json.senior_name }}",
+          "html": "=<p>Hi {{ $json.first_name }},</p><p>We'd appreciate your monthly feedback about <strong>{{ $json.senior_name }}</strong>.</p><p><a href=\"{{ $json.form_url }}\">Click here to complete the caregiver feedback form</a></p><p>Thank you!<br><em>Conversations to Remember</em></p>",
+          "options": {}
+        },
+        "id": "n8b",
+        "name": "Send Caregiver Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          1776,
+          400
+        ],
+        "webhookId": "b970ef74-9c01-40eb-b775-61b94a820502",
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Active Seniors",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Seniors": {
+        "main": [
+          [
+            {
+              "node": "Extract Seniors",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Seniors": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer Teams",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Senior Relationships",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer Teams": {
+        "main": [
+          [
+            {
+              "node": "Extract Teams",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Teams": {
+        "main": [
+          [
+            {
+              "node": "Get Active Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Members": {
+        "main": [
+          [
+            {
+              "node": "Split Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Members": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Get Volunteer Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Volunteer Person": {
+        "main": [
+          [
+            {
+              "node": "Build Vol Email Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Vol Email Data": {
+        "main": [
+          [
+            {
+              "node": "Send Volunteer Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Senior Relationships": {
+        "main": [
+          [
+            {
+              "node": "Split Relationships",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Relationships": {
+        "main": [
+          [
+            {
+              "node": "Get Caregiver Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Caregiver Person": {
+        "main": [
+          [
+            {
+              "node": "Build Care Email Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Care Email Data": {
+        "main": [
+          [
+            {
+              "node": "Send Caregiver Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version 6a707f71",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:26:30.425Z",
+        "id": 177,
+        "workflowId": "pZ24lHHhSsO8TO7r",
+        "versionId": "6a707f71-6c80-4843-98a4-1b7635c42a00",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

@@ -1,0 +1,619 @@
+{
+  "updatedAt": "2026-03-21T18:26:55.596Z",
+  "createdAt": "2026-03-20T22:37:54.720Z",
+  "id": "QmVAo6sTLOflaeFt",
+  "name": "WF5 \u2014 Weekly Meeting Instance Generator",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "2590299e-9946-45d8-a984-a512a36e8850",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&size=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "17874d14-d11b-478f-b6e7-84c0343667e0",
+      "name": "Get Active Meetings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map day name to offset from Monday (0=Mon, 6=Sun)\nconst dayOffset = {\n  Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3,\n  Friday: 4, Saturday: 5, Sunday: 6\n};\n\n// Get Monday of current week (UTC)\nconst now = new Date();\nconst dow = now.getUTCDay(); // 0=Sun\nconst daysFromMonday = (dow + 6) % 7;\nconst monday = new Date(now);\nmonday.setUTCDate(now.getUTCDate() - daysFromMonday);\nmonday.setUTCHours(0, 0, 0, 0);\n\nconst meetings = $input.first().json.results || [];\nconst items = [];\n\nfor (const meeting of meetings) {\n  const dayName = (meeting.meeting_day_of_week?.value || meeting.meeting_day_of_week || '').trim();\n  const offset = dayOffset[dayName];\n  if (offset === undefined) continue;\n\n  const instanceDate = new Date(monday);\n  instanceDate.setUTCDate(monday.getUTCDate() + offset);\n  const dateStr = instanceDate.toISOString().split('T')[0];\n\n  const timeStr = (meeting.meeting_time || '09:00').trim();\n  const [hours, minutes] = timeStr.split(':').map(Number);\n\n  const startDt = new Date(instanceDate);\n  startDt.setUTCHours(hours, minutes, 0, 0);\n  const endDt = new Date(startDt);\n  endDt.setUTCHours(startDt.getUTCHours() + 1);\n\n  const teamId = (meeting.team || [])[0]?.id;\n\n  items.push({ json: {\n    meeting_id: meeting.id,\n    team_id: teamId,\n    instance_date: dateStr,\n    instance_start: startDt.toISOString(),\n    instance_end: endDt.toISOString()\n  }});\n}\nreturn items;\n"
+      },
+      "id": "8205d6ac-f8c8-4b9d-99c2-64f31766ccac",
+      "name": "Compute Instance Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting\",\"type\":\"link_row_has\",\"value\":\"{{ $json.meeting_id }}\"},{\"field\":\"instance_date\",\"type\":\"date_equal\",\"value\":\"{{ $json.instance_date }}\"}]}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "678b1bde-aa56-4e94-a711-76aa14a76b52",
+      "name": "Check Instance Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst existing = $input.all();\nconst computed = $('Compute Instance Dates').all();\n\nfor (let i = 0; i < computed.length; i++) {\n    const count = (existing[i]?.json?.count || 0);\n    if (count === 0) {\n          results.push({ json: computed[i].json });\n    }\n}\nreturn results;"
+      },
+      "id": "3e4a6050-05cb-4540-ab61-06e37ca5a7f7",
+      "name": "Filter New Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"meeting\": [{{ $json.meeting_id }}], \"instance_date\": \"{{ $json.instance_date }}\", \"instance_start\": \"{{ $json.instance_start }}\", \"instance_end\": \"{{ $json.instance_end }}\", \"instance_status\": \"scheduled\"}",
+        "options": {}
+      },
+      "id": "4c4c5a97-b81b-41ba-b335-4134f5e57d28",
+      "name": "Create Meeting Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"team\",\"type\":\"link_row_has\",\"value\":\"{{ $('Filter New Only').item.json.team_id }}\"},{\"field\":\"end_date\",\"type\":\"empty\",\"value\":\"\"}]}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ec498690-edfa-48d4-875e-61de06baf5c1",
+      "name": "Get Active Team Members",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const instanceId = $('Create Meeting Instance').item.json.id;\nconst teamId = $('Filter New Only').item.json.team_id;\nconst members = $input.item.json.results || [];\nreturn members\n  .filter(m => (m.volunteer || []).length > 0)\n  .map(m => ({ json: {\n    instanceId,\n    volunteerId: (m.volunteer || [])[0].id,\n    volunteerName: (m.volunteer || [])[0].value\n  }}));\n"
+      },
+      "id": "6d4823f3-a002-424e-ad9d-240c6995b89e",
+      "name": "Split Into Members",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"meeting_instance\": [{{ $json.instanceId }}], \"volunteer\": [{{ $json.volunteerId }}], \"attendance_status\": \"expected\"}",
+        "options": {}
+      },
+      "id": "3eae4f6b-0494-4187-a4a6-f8bda029811f",
+      "name": "POST Attendance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Active Meetings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Meetings": {
+      "main": [
+        [
+          {
+            "node": "Compute Instance Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Instance Dates": {
+      "main": [
+        [
+          {
+            "node": "Check Instance Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Instance Exists": {
+      "main": [
+        [
+          {
+            "node": "Filter New Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Only": {
+      "main": [
+        [
+          {
+            "node": "Create Meeting Instance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Meeting Instance": {
+      "main": [
+        [
+          {
+            "node": "Get Active Team Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Team Members": {
+      "main": [
+        [
+          {
+            "node": "Split Into Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Members": {
+      "main": [
+        [
+          {
+            "node": "POST Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "3c266742-20d9-4014-8671-d0f4047670b7",
+  "activeVersionId": "3c266742-20d9-4014-8671-d0f4047670b7",
+  "versionCounter": 22,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-20T22:37:54.723Z",
+      "createdAt": "2026-03-20T22:37:54.723Z",
+      "role": "workflow:owner",
+      "workflowId": "QmVAo6sTLOflaeFt",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T18:26:56.000Z",
+    "createdAt": "2026-03-21T18:26:55.596Z",
+    "versionId": "3c266742-20d9-4014-8671-d0f4047670b7",
+    "workflowId": "QmVAo6sTLOflaeFt",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "weeks",
+                "triggerAtDay": [
+                  1
+                ],
+                "triggerAtHour": 6
+              }
+            ]
+          }
+        },
+        "id": "2590299e-9946-45d8-a984-a512a36e8850",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          208,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/565/?user_field_names=true&size=100",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "17874d14-d11b-478f-b6e7-84c0343667e0",
+        "name": "Get Active Meetings",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          432,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Map day name to offset from Monday (0=Mon, 6=Sun)\nconst dayOffset = {\n  Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3,\n  Friday: 4, Saturday: 5, Sunday: 6\n};\n\n// Get Monday of current week (UTC)\nconst now = new Date();\nconst dow = now.getUTCDay(); // 0=Sun\nconst daysFromMonday = (dow + 6) % 7;\nconst monday = new Date(now);\nmonday.setUTCDate(now.getUTCDate() - daysFromMonday);\nmonday.setUTCHours(0, 0, 0, 0);\n\nconst meetings = $input.first().json.results || [];\nconst items = [];\n\nfor (const meeting of meetings) {\n  const dayName = (meeting.meeting_day_of_week?.value || meeting.meeting_day_of_week || '').trim();\n  const offset = dayOffset[dayName];\n  if (offset === undefined) continue;\n\n  const instanceDate = new Date(monday);\n  instanceDate.setUTCDate(monday.getUTCDate() + offset);\n  const dateStr = instanceDate.toISOString().split('T')[0];\n\n  const timeStr = (meeting.meeting_time || '09:00').trim();\n  const [hours, minutes] = timeStr.split(':').map(Number);\n\n  const startDt = new Date(instanceDate);\n  startDt.setUTCHours(hours, minutes, 0, 0);\n  const endDt = new Date(startDt);\n  endDt.setUTCHours(startDt.getUTCHours() + 1);\n\n  const teamId = (meeting.team || [])[0]?.id;\n\n  items.push({ json: {\n    meeting_id: meeting.id,\n    team_id: teamId,\n    instance_date: dateStr,\n    instance_start: startDt.toISOString(),\n    instance_end: endDt.toISOString()\n  }});\n}\nreturn items;\n"
+        },
+        "id": "8205d6ac-f8c8-4b9d-99c2-64f31766ccac",
+        "name": "Compute Instance Dates",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          656,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"meeting\",\"type\":\"link_row_has\",\"value\":\"{{ $json.meeting_id }}\"},{\"field\":\"instance_date\",\"type\":\"date_equal\",\"value\":\"{{ $json.instance_date }}\"}]}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "678b1bde-aa56-4e94-a711-76aa14a76b52",
+        "name": "Check Instance Exists",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          880,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = [];\nconst existing = $input.all();\nconst computed = $('Compute Instance Dates').all();\n\nfor (let i = 0; i < computed.length; i++) {\n    const count = (existing[i]?.json?.count || 0);\n    if (count === 0) {\n          results.push({ json: computed[i].json });\n    }\n}\nreturn results;"
+        },
+        "id": "3e4a6050-05cb-4540-ab61-06e37ca5a7f7",
+        "name": "Filter New Only",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/566/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"meeting\": [{{ $json.meeting_id }}], \"instance_date\": \"{{ $json.instance_date }}\", \"instance_start\": \"{{ $json.instance_start }}\", \"instance_end\": \"{{ $json.instance_end }}\", \"instance_status\": \"scheduled\"}",
+          "options": {}
+        },
+        "id": "4c4c5a97-b81b-41ba-b335-4134f5e57d28",
+        "name": "Create Meeting Instance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1328,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/564/?user_field_names=true&filters={\"filter_type\":\"AND\",\"filters\":[{\"field\":\"team\",\"type\":\"link_row_has\",\"value\":\"{{ $('Filter New Only').item.json.team_id }}\"},{\"field\":\"end_date\",\"type\":\"empty\",\"value\":\"\"}]}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ec498690-edfa-48d4-875e-61de06baf5c1",
+        "name": "Get Active Team Members",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1552,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const instanceId = $('Create Meeting Instance').item.json.id;\nconst teamId = $('Filter New Only').item.json.team_id;\nconst members = $input.item.json.results || [];\nreturn members\n  .filter(m => (m.volunteer || []).length > 0)\n  .map(m => ({ json: {\n    instanceId,\n    volunteerId: (m.volunteer || [])[0].id,\n    volunteerName: (m.volunteer || [])[0].value\n  }}));\n"
+        },
+        "id": "6d4823f3-a002-424e-ad9d-240c6995b89e",
+        "name": "Split Into Members",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1776,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://baserow.conversationstoremember.org/api/database/rows/table/567/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"meeting_instance\": [{{ $json.instanceId }}], \"volunteer\": [{{ $json.volunteerId }}], \"attendance_status\": \"expected\"}",
+          "options": {}
+        },
+        "id": "3eae4f6b-0494-4187-a4a6-f8bda029811f",
+        "name": "POST Attendance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2000,
+          304
+        ]
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Active Meetings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Meetings": {
+        "main": [
+          [
+            {
+              "node": "Compute Instance Dates",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute Instance Dates": {
+        "main": [
+          [
+            {
+              "node": "Check Instance Exists",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Instance Exists": {
+        "main": [
+          [
+            {
+              "node": "Filter New Only",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter New Only": {
+        "main": [
+          [
+            {
+              "node": "Create Meeting Instance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Meeting Instance": {
+        "main": [
+          [
+            {
+              "node": "Get Active Team Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Active Team Members": {
+        "main": [
+          [
+            {
+              "node": "Split Into Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Into Members": {
+        "main": [
+          [
+            {
+              "node": "POST Attendance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": "Version 3c266742",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T18:26:56.939Z",
+        "id": 183,
+        "workflowId": "QmVAo6sTLOflaeFt",
+        "versionId": "3c266742-20d9-4014-8671-d0f4047670b7",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}

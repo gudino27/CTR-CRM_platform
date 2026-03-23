@@ -1,0 +1,1005 @@
+{
+  "updatedAt": "2026-03-21T20:10:25.931Z",
+  "createdAt": "2026-03-21T18:46:46.169Z",
+  "id": "yw1M1J5wQffS26rP",
+  "name": "WF4 \u2014 Substitution Handling (Calendar Patch + Email)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf4-substitution",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "97070c7a-c618-4394-a334-15da9335f50c",
+      "webhookId": "78b8e376-5386-4037-8b66-f79a66d746d0"
+    },
+    {
+      "name": "Parse Attendance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst items = body.items || [];\nconst oldItems = body.old_items || [];\n\nconst item = items[0] || {};\nconst oldItem = oldItems[0] || {};\n\nconst attendanceId      = item.id;\nconst meetingInstanceId = (item.meeting_instance || [])[0]?.id;\nconst volunteerId       = (item.volunteer || [])[0]?.id;\nconst newStatus         = item.attendance_status?.value || item.attendance_status || '';\nconst oldStatus         = oldItem.attendance_status?.value || oldItem.attendance_status || '';\n\nreturn [{ json: { attendanceId, meetingInstanceId, volunteerId, newStatus, oldStatus } }];"
+      },
+      "id": "0b99120d-506f-46fd-bda4-2ef4f2339530"
+    },
+    {
+      "name": "Status Just Set to Substitute?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.newStatus }}",
+              "rightValue": "substitute",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond2",
+              "leftValue": "={{ $json.oldStatus }}",
+              "rightValue": "substitute",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "d0492ba7-35f6-4ce8-b1df-50cf5fef3bc8"
+    },
+    {
+      "name": "Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        520
+      ],
+      "parameters": {},
+      "id": "951934f6-3e34-49bf-b568-08fb2812ece3"
+    },
+    {
+      "name": "Get Meeting Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $json.meetingInstanceId }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60229103-13c5-4461-adab-e0aab39e12c7"
+    },
+    {
+      "name": "Get Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a8283f1-a8b6-44be-b886-ccf02558bdd5"
+    },
+    {
+      "name": "Get Sub Volunteer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $('Parse Attendance').item.json.volunteerId }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed87e89f-2cf1-4272-9fe3-b7772927c55a"
+    },
+    {
+      "name": "Get Sub Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "27c40943-5b56-4b77-b67f-812aadf1ea05"
+    },
+    {
+      "name": "Build Sub Calendar Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const meeting  = $('Get Meeting').item.json;\nconst instance = $('Get Meeting Instance').item.json;\nconst subPerson = $input.first().json;\n\nconst subEmail   = subPerson.email || '';\nconst subName    = subPerson.Name || ((subPerson.first_name || '') + ' ' + (subPerson.last_name || '')).trim();\nconst meetingLink = meeting.meeting_link || '';\nconst calendarId  = meeting.google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com';\nconst calEventId  = meeting.calendar_event_id || '';\n\n// Use instance_date (YYYY-MM-DD) to build a full-day UTC window\n// This avoids timezone offset mismatches when querying Google Calendar instances\nconst instanceDate = instance.instance_date || instance.instance_start?.split('T')[0] || '';\nif (!instanceDate) throw new Error('No instance_date on meeting instance row');\n\nconst timeMin = instanceDate + 'T00:00:00Z';\nconst timeMax = instanceDate + 'T23:59:59Z';\n\nreturn [{ json: { calendarId, calEventId, subEmail, subName, meetingLink, timeMin, timeMax } }];"
+      },
+      "id": "2839f498-5dc8-438a-a13b-1ff7f0ccc174"
+    },
+    {
+      "name": "Get Calendar Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Build Sub Calendar Patch').item.json.calendarId) }}/events/{{ $('Build Sub Calendar Patch').item.json.calEventId }}/instances?timeMin={{ encodeURIComponent($json.timeMin) }}&timeMax={{ encodeURIComponent($json.timeMax) }}&maxResults=5",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      },
+      "id": "b3a0dd13-839d-48e0-b360-079d87fcae8d"
+    },
+    {
+      "name": "Calendar Occurrence Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ ($json.items || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "4133f0a1-be5b-4add-8d46-6c9ae8c81356"
+    },
+    {
+      "name": "Skip No Calendar",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        520
+      ],
+      "parameters": {},
+      "id": "96e16f4e-a6d8-4cfb-a680-6b0c4a8df662"
+    },
+    {
+      "name": "Patch Calendar Occurrence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Build Sub Calendar Patch').item.json.calendarId) }}/events/{{ $json.items[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"summary\": \"CTR Visit (Sub: {{ $('Build Sub Calendar Patch').item.json.subName }})\", \"attendees\": [{\"email\": \"{{ $('Build Sub Calendar Patch').item.json.subEmail }}\", \"displayName\": \"{{ $('Build Sub Calendar Patch').item.json.subName }}\", \"responseStatus\": \"needsAction\"}]}",
+        "options": {}
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "swQQbJOZ8pjWMSfx",
+          "name": "Google Calendar account"
+        }
+      },
+      "id": "37db92db-f01a-48b0-9e3b-a5face5140ee"
+    },
+    {
+      "name": "Email Substitute Volunteer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "={{ $('Build Sub Calendar Patch').item.json.subEmail }}",
+        "subject": "=CTR Visit Substitution \u2014 You're covering a session!",
+        "html": "=<p>Hi {{ $('Build Sub Calendar Patch').item.json.subName }},</p><p>You have been assigned as a <strong>substitute volunteer</strong> for an upcoming CTR visit.</p><p><strong>Meeting link:</strong> <a href=\"{{ $('Build Sub Calendar Patch').item.json.meetingLink }}\">{{ $('Build Sub Calendar Patch').item.json.meetingLink }}</a></p><p>Please join at the scheduled time. The director will be in touch if you have questions.</p><p>Thank you for stepping in!<br>CTR Team</p>",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      },
+      "id": "7e7e7973-abf7-4ddc-9cd8-2a669d4b314b"
+    },
+    {
+      "name": "Notify Director",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "fromEmail": "noreply@conversationstoremember.org",
+        "toEmail": "jaime.gudino@conversationstoremember.org",
+        "subject": "=CTR: Substitution applied for meeting instance {{ $('Parse Attendance').item.json.meetingInstanceId }}",
+        "html": "=<p>A substitution has been applied.</p><p><strong>Meeting Instance ID:</strong> {{ $('Parse Attendance').item.json.meetingInstanceId }}<br><strong>Original Attendance ID:</strong> {{ $('Parse Attendance').item.json.attendanceId }}<br><strong>Substitute:</strong> {{ $('Build Sub Calendar Patch').item.json.subName }} ({{ $('Build Sub Calendar Patch').item.json.subEmail }})</p><p>The calendar occurrence has been updated with the substitute's information.</p>",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "nxCoGS53k8oht8s0",
+          "name": "SMTP account"
+        }
+      },
+      "id": "84c27995-8fa6-4f5c-b585-48b5d2bd8f0c"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Attendance": {
+      "main": [
+        [
+          {
+            "node": "Status Just Set to Substitute?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Just Set to Substitute?": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting Instance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting Instance": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting": {
+      "main": [
+        [
+          {
+            "node": "Get Sub Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sub Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Get Sub Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sub Person": {
+      "main": [
+        [
+          {
+            "node": "Build Sub Calendar Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sub Calendar Patch": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Instance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Instance": {
+      "main": [
+        [
+          {
+            "node": "Calendar Occurrence Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Occurrence Found?": {
+      "main": [
+        [
+          {
+            "node": "Patch Calendar Occurrence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip No Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Calendar Occurrence": {
+      "main": [
+        [
+          {
+            "node": "Email Substitute Volunteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Substitute Volunteer": {
+      "main": [
+        [
+          {
+            "node": "Notify Director",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "2f79d82a-c47e-4d49-ad73-946be98530b5",
+  "activeVersionId": "2f79d82a-c47e-4d49-ad73-946be98530b5",
+  "versionCounter": 26,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T18:46:46.170Z",
+      "createdAt": "2026-03-21T18:46:46.170Z",
+      "role": "workflow:owner",
+      "workflowId": "yw1M1J5wQffS26rP",
+      "projectId": "bpvNrEJi6gIk3zG4",
+      "project": {
+        "updatedAt": "2025-11-14T08:10:15.255Z",
+        "createdAt": "2025-11-14T07:48:45.521Z",
+        "id": "bpvNrEJi6gIk3zG4",
+        "name": "jaime gudino <gudino27@icloud.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-21T20:10:25.931Z",
+    "createdAt": "2026-03-21T20:10:25.931Z",
+    "versionId": "2f79d82a-c47e-4d49-ad73-946be98530b5",
+    "workflowId": "yw1M1J5wQffS26rP",
+    "nodes": [
+      {
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          300
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf4-substitution",
+          "responseMode": "onReceived",
+          "options": {}
+        },
+        "id": "97070c7a-c618-4394-a334-15da9335f50c",
+        "webhookId": "78b8e376-5386-4037-8b66-f79a66d746d0"
+      },
+      {
+        "name": "Parse Attendance",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst items = body.items || [];\nconst oldItems = body.old_items || [];\n\nconst item = items[0] || {};\nconst oldItem = oldItems[0] || {};\n\nconst attendanceId      = item.id;\nconst meetingInstanceId = (item.meeting_instance || [])[0]?.id;\nconst volunteerId       = (item.volunteer || [])[0]?.id;\nconst newStatus         = item.attendance_status?.value || item.attendance_status || '';\nconst oldStatus         = oldItem.attendance_status?.value || oldItem.attendance_status || '';\n\nreturn [{ json: { attendanceId, meetingInstanceId, volunteerId, newStatus, oldStatus } }];"
+        },
+        "id": "0b99120d-506f-46fd-bda4-2ef4f2339530"
+      },
+      {
+        "name": "Status Just Set to Substitute?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          480,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond1",
+                "leftValue": "={{ $json.newStatus }}",
+                "rightValue": "substitute",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              },
+              {
+                "id": "cond2",
+                "leftValue": "={{ $json.oldStatus }}",
+                "rightValue": "substitute",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        },
+        "id": "d0492ba7-35f6-4ce8-b1df-50cf5fef3bc8"
+      },
+      {
+        "name": "Skip",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          480,
+          520
+        ],
+        "parameters": {},
+        "id": "951934f6-3e34-49bf-b568-08fb2812ece3"
+      },
+      {
+        "name": "Get Meeting Instance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          720,
+          300
+        ],
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/566/{{ $json.meetingInstanceId }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "60229103-13c5-4461-adab-e0aab39e12c7"
+      },
+      {
+        "name": "Get Meeting",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          960,
+          300
+        ],
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/565/{{ $json.meeting[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "2a8283f1-a8b6-44be-b886-ccf02558bdd5"
+      },
+      {
+        "name": "Get Sub Volunteer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1200,
+          300
+        ],
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/561/{{ $('Parse Attendance').item.json.volunteerId }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ed87e89f-2cf1-4272-9fe3-b7772927c55a"
+      },
+      {
+        "name": "Get Sub Person",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1440,
+          300
+        ],
+        "parameters": {
+          "url": "=https://baserow.conversationstoremember.org/api/database/rows/table/556/{{ $json.person[0].id }}/?user_field_names=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Token BHV3LDvlpFHIwdrNXOB09ddaW3qb6yNp"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "27c40943-5b56-4b77-b67f-812aadf1ea05"
+      },
+      {
+        "name": "Build Sub Calendar Patch",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1680,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const meeting  = $('Get Meeting').item.json;\nconst instance = $('Get Meeting Instance').item.json;\nconst subPerson = $input.first().json;\n\nconst subEmail   = subPerson.email || '';\nconst subName    = subPerson.Name || ((subPerson.first_name || '') + ' ' + (subPerson.last_name || '')).trim();\nconst meetingLink = meeting.meeting_link || '';\nconst calendarId  = meeting.google_calendar_id || 'e8a07748b896cc2ae78ce0296041d68cefed0c89d9e0cd4ec15b4fa42eae1756@group.calendar.google.com';\nconst calEventId  = meeting.calendar_event_id || '';\n\n// Use instance_date (YYYY-MM-DD) to build a full-day UTC window\n// This avoids timezone offset mismatches when querying Google Calendar instances\nconst instanceDate = instance.instance_date || instance.instance_start?.split('T')[0] || '';\nif (!instanceDate) throw new Error('No instance_date on meeting instance row');\n\nconst timeMin = instanceDate + 'T00:00:00Z';\nconst timeMax = instanceDate + 'T23:59:59Z';\n\nreturn [{ json: { calendarId, calEventId, subEmail, subName, meetingLink, timeMin, timeMax } }];"
+        },
+        "id": "2839f498-5dc8-438a-a13b-1ff7f0ccc174"
+      },
+      {
+        "name": "Get Calendar Instance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1920,
+          300
+        ],
+        "parameters": {
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Build Sub Calendar Patch').item.json.calendarId) }}/events/{{ $('Build Sub Calendar Patch').item.json.calEventId }}/instances?timeMin={{ encodeURIComponent($json.timeMin) }}&timeMax={{ encodeURIComponent($json.timeMax) }}&maxResults=5",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "options": {}
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        },
+        "id": "b3a0dd13-839d-48e0-b360-079d87fcae8d"
+      },
+      {
+        "name": "Calendar Occurrence Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          2160,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond1",
+                "leftValue": "={{ ($json.items || []).length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        },
+        "id": "4133f0a1-be5b-4add-8d46-6c9ae8c81356"
+      },
+      {
+        "name": "Skip No Calendar",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          2160,
+          520
+        ],
+        "parameters": {},
+        "id": "96e16f4e-a6d8-4cfb-a680-6b0c4a8df662"
+      },
+      {
+        "name": "Patch Calendar Occurrence",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          2400,
+          300
+        ],
+        "parameters": {
+          "method": "PATCH",
+          "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Build Sub Calendar Patch').item.json.calendarId) }}/events/{{ $json.items[0].id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleCalendarOAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"summary\": \"CTR Visit (Sub: {{ $('Build Sub Calendar Patch').item.json.subName }})\", \"attendees\": [{\"email\": \"{{ $('Build Sub Calendar Patch').item.json.subEmail }}\", \"displayName\": \"{{ $('Build Sub Calendar Patch').item.json.subName }}\", \"responseStatus\": \"needsAction\"}]}",
+          "options": {}
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "swQQbJOZ8pjWMSfx",
+            "name": "Google Calendar account"
+          }
+        },
+        "id": "37db92db-f01a-48b0-9e3b-a5face5140ee"
+      },
+      {
+        "name": "Email Substitute Volunteer",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          2640,
+          300
+        ],
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "={{ $('Build Sub Calendar Patch').item.json.subEmail }}",
+          "subject": "=CTR Visit Substitution \u2014 You're covering a session!",
+          "html": "=<p>Hi {{ $('Build Sub Calendar Patch').item.json.subName }},</p><p>You have been assigned as a <strong>substitute volunteer</strong> for an upcoming CTR visit.</p><p><strong>Meeting link:</strong> <a href=\"{{ $('Build Sub Calendar Patch').item.json.meetingLink }}\">{{ $('Build Sub Calendar Patch').item.json.meetingLink }}</a></p><p>Please join at the scheduled time. The director will be in touch if you have questions.</p><p>Thank you for stepping in!<br>CTR Team</p>",
+          "options": {}
+        },
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        },
+        "id": "7e7e7973-abf7-4ddc-9cd8-2a669d4b314b"
+      },
+      {
+        "name": "Notify Director",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          2880,
+          300
+        ],
+        "parameters": {
+          "fromEmail": "noreply@conversationstoremember.org",
+          "toEmail": "jaime.gudino@conversationstoremember.org",
+          "subject": "=CTR: Substitution applied for meeting instance {{ $('Parse Attendance').item.json.meetingInstanceId }}",
+          "html": "=<p>A substitution has been applied.</p><p><strong>Meeting Instance ID:</strong> {{ $('Parse Attendance').item.json.meetingInstanceId }}<br><strong>Original Attendance ID:</strong> {{ $('Parse Attendance').item.json.attendanceId }}<br><strong>Substitute:</strong> {{ $('Build Sub Calendar Patch').item.json.subName }} ({{ $('Build Sub Calendar Patch').item.json.subEmail }})</p><p>The calendar occurrence has been updated with the substitute's information.</p>",
+          "options": {}
+        },
+        "credentials": {
+          "smtp": {
+            "id": "nxCoGS53k8oht8s0",
+            "name": "SMTP account"
+          }
+        },
+        "id": "84c27995-8fa6-4f5c-b585-48b5d2bd8f0c"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Parse Attendance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Attendance": {
+        "main": [
+          [
+            {
+              "node": "Status Just Set to Substitute?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Status Just Set to Substitute?": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting Instance",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting Instance": {
+        "main": [
+          [
+            {
+              "node": "Get Meeting",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meeting": {
+        "main": [
+          [
+            {
+              "node": "Get Sub Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Sub Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Get Sub Person",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Sub Person": {
+        "main": [
+          [
+            {
+              "node": "Build Sub Calendar Patch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Sub Calendar Patch": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Instance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Instance": {
+        "main": [
+          [
+            {
+              "node": "Calendar Occurrence Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calendar Occurrence Found?": {
+        "main": [
+          [
+            {
+              "node": "Patch Calendar Occurrence",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip No Calendar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Patch Calendar Occurrence": {
+        "main": [
+          [
+            {
+              "node": "Email Substitute Volunteer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Substitute Volunteer": {
+        "main": [
+          [
+            {
+              "node": "Notify Director",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "jaime gudino",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-21T20:10:25.965Z",
+        "id": 236,
+        "workflowId": "yw1M1J5wQffS26rP",
+        "versionId": "2f79d82a-c47e-4d49-ad73-946be98530b5",
+        "event": "activated",
+        "userId": "d7ce471d-e89c-45e4-a4fb-7efc66b2bafc"
+      }
+    ]
+  }
+}
