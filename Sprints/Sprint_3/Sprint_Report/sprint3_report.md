@@ -1,31 +1,56 @@
-# Sprint 3 Report (Dates from Sprint 3 Start to Sprint 3 End)
+# Sprint 3 Report (Mar 26th, 2026 - May 1st, 2026)
 
 ## YouTube link of Sprint 1 Video (Make this video unlisted)
 TODO: 
 
 ## What's New (User Facing)
-* Project repo structure created (docs/ folder, templates added)
-* Initial requirements + system understanding documented (tools + data flow)
-* First-pass database model drafted for CRM entities (people, seniors, volunteers, teams, meetings, feedback)
+* Full CRM workflow demonstrated end-to-end during client demo:
+    * Add Senior
+    * Add Volunteer
+    * Create Team (Call Group)
+    * Assign Team Members
+    * Set Up Meeting
+* Meetings automatically create and sync Google Calendar events
+* Weekly meeting instances and attendance tracking fully functional
+* Cancellation, substitution, and reminder features now operational
+* Existing pages fully functional:
+    * Dashboard, Seniors, Volunteers, Teams, Groups, Schedule, Meetings, Feedback, Approvals
+* Role-based navigation and access confirmed working
 
 ## Work Summary (Developer Facing)
-This sprint focused on understanding the client’s workflow and translating it into an initial technical plan. We reviewed the project deliverables (web app, mobile app, dashboard, database, backend/API) and the required tools (MySQL, n8n, Baserow, Rocket.Chat). We held team discussions and consolidated requirements into a first-pass data model, including core CRM tables and relationships (seniors, volunteers, meetings, attendance, feedback). In parallel, we did early feasibility checks on Google Calendar integration and clarified how Baserow will be used as an admin-friendly CRM UI while the backend stores the source-of-truth data. We also created a Kanban workflow and defined Sprint 2 tasks based on gaps found in Sprint 1.
+Sprint 3 focused on completing the core automation layer, validating the full system through a client demo, and preparing for deployment and handoff.
+
+All major N8N workflows (WF1–WF7, WF9) are now implemented and functioning. This includes calendar synchronization, weekly instance generation, cancellation handling, substitution updates, reminder notifications, and approval-based workflow execution. These workflows complete the system’s automation backbone and allow the CRM to operate with minimal manual intervention.
+
+The system architecture—Baserow (database + UI), N8N (automation), and Google Calendar API—was fully validated in an integrated environment. Data flows correctly from user input in the App Builder through Baserow tables into N8N workflows, which then trigger calendar updates and notifications.
+
+The team also prepared the system for client ownership by organizing N8N workflows for export as JSON files and documenting the migration process. Deployment requirements, including domain configuration, were discussed with the client.
+
+Minor improvements identified during the demo include expanding timezone support (Alaska, Hawaii, Puerto Rico).
 
 ## Unfinished Work
-* Finalized, client-approved schema (still awaiting confirmation on required fields and feedback form frequency)
-* End-to-end integration prototype (calendar <-> backend <-> Baserow is planned for next sprint)
+* Domain setup and deployment configuration (pending client support)
+* Timezone expansion (Alaska, Hawaii, Puerto Rico)
+* Optional enhancements and polish based on client feedback
 
 ## Completed Issues/User Stories
-Here are links to the issues that we completed in this sprint:
-* TODO: URL of issue 1 (e.g., Requirements + workflow write-up)
-* TODO: URL of issue 2 (e.g., Draft ERD / data model)
-* TODO: URL of issue 3 (e.g., Calendar integration feasibility test)
-* TODO: URL of issue 4 (e.g., Repo setup + docs templates)
+* End-to-end CRM workflow validated through live client demo
+* Full database schema (16 tables and relationships) operational
+* Baserow App Builder interface completed across all pages
+* WF1 – Calendar Sync
+* WF2 – Team Member Change
+* WF3 – Instance Cancellation
+* WF4 – Substitution Handling
+* WF5 – Weekly Instance Generator
+* WF6 – Pre-Meeting Reminder
+* WF7 – Monthly Feedback Dispatch
+* WF9 – Approval Gate
+* N8N workflows prepared for export and client migration
+* System architecture fully validated (Baserow + N8N + Google Calendar)
 
 ## Incomplete Issues/User Stories
-Here are links to issues we worked on but did not complete in this sprint:
-* TODO: URL of issue A <<Waiting on client confirmation for required fields>>
-* TODO: URL of issue B <<Needs more time to validate integration approach>>
+* WF10 – iCal Feed (not fully validated with client use case)
+* Deployment dependent on client domain setup
 
 ## Code Files for Review
 Please review the following code files, which were actively developed during this sprint, for quality:
@@ -33,16 +58,16 @@ Please review the following code files, which were actively developed during thi
 * TODO: [file 2](https://github.com/ORG/REPO/path)
 
 ## Retrospective Summary
-Here's what went well:
-* We aligned on the big-picture system flow and tool responsibilities.
-* We converted early requirements into concrete tables/entities.
-* We started testing risky parts early (calendar integration).
+What went well:
 
-Here's what we'd like to improve:
-* Get client confirmation earlier on “must-have” fields and business rules.
-* Smaller issues and clearer acceptance criteria before starting work.
+* All core workflows are now implemented and functional
+* Successful client demo validated the complete system
+* Automation layer significantly reduces manual effort
+* System is near deployment-ready and handoff-ready
+* Documentation supports client migration and maintenance
 
-Here are changes we plan to implement in the next sprint:
-* Lock Sprint 2 scope with a prioritized backlog.
-* Convert schema draft into Baserow tables + relationships.
-* Build a thin integration slice (one meeting record flowing end-to-end).
+What to improve:
+
+* Deployment still depends on client-side configuration (domain, credentials)
+* Some features require final validation in real client environment
+* Additional polishing may be needed based on final feedback
