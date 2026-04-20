@@ -1,8 +1,9 @@
-# Sprint 2 Report (Feb 21, 2026 – Mar 24, 2026)
+# Sprint 3 Report (Mar 24, 2026 – Apr, 2026)
 
-## YouTube link of Sprint 2 Video 
+## YouTube link of Sprint 3 Video 
 
 https://github.com/gudino27/CTR-CRM_platform/tree/main/Sprints/Sprint_2
+
 ## What's New (User Facing)
 
 * Full CRM database live in Baserow: all 16 tables with relationships, lookup fields, and formula-based display names
