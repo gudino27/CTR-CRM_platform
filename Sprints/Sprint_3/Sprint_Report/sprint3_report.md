@@ -1,7 +1,7 @@
 # Sprint 3 Report (Mar 26th, 2026 - May 1st, 2026)
 
-## YouTube link of Sprint 1 Video (Make this video unlisted)
-TODO: 
+## YouTube link of Sprint Video (Make this video unlisted)
+TODO: https://youtu.be/9zd2bzavRyM
 
 ## What's New (User Facing)
 * Full CRM workflow demonstrated end-to-end during client demo:
@@ -53,9 +53,7 @@ Minor improvements identified during the demo include expanding timezone support
 * Deployment dependent on client domain setup
 
 ## Code Files for Review
-Please review the following code files, which were actively developed during this sprint, for quality:
-* TODO: [file 1](https://github.com/ORG/REPO/path)
-* TODO: [file 2](https://github.com/ORG/REPO/path)
+### Not applicable project is in baserow and n8n.
 
 ## Retrospective Summary
 What went well:
