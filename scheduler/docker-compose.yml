@@ -1,0 +1,15 @@
+services:
+  scheduler:
+    build: .
+    image: ghcr.io/gudino27/ctr-social-scheduler:latest
+    env_file: .env
+    environment:
+      DB_PATH: /data/scheduler.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - scheduler-data:/data
+    restart: unless-stopped
+
+volumes:
+  scheduler-data:

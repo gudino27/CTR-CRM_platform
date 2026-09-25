@@ -1,0 +1,17 @@
+{
+  "name": "@ctr-scheduler/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "start": "node --env-file-if-exists=../.env src/index.js",
+    "seed": "node --env-file-if-exists=../.env src/db/seed.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@googleapis/calendar": "^20.0.0",
+    "express": "^5.2.1"
+  }
+}
