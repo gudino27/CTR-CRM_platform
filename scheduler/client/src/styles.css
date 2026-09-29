@@ -541,6 +541,14 @@ section > div label:has(input[type="checkbox"]) {
   justify-content: space-between;
 }
 
+.remove-button {
+  background: #dc2626;
+}
+
+.remove-button:hover {
+  background: #b91c1c;
+}
+
 .post-details-header h2 {
   margin: 0;
   border: 0;

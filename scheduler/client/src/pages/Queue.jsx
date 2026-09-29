@@ -54,6 +54,19 @@ export default function Queue() {
     savePosts(updatedPosts);
   }
 
+  function updateOverrideTime(id, time) {
+    const updatedPosts = posts.map((post) =>
+      post.id === id
+        ? {
+            ...post,
+            overrideTime: time,
+          }
+        : post
+    );
+
+    savePosts(updatedPosts);
+  }
+
   function movePost(id, direction) {
     const updatedPosts = [...posts];
 
@@ -219,6 +232,24 @@ export default function Queue() {
                       }
                       onChange={(event) =>
                         updateOverrideDate(
+                          post.id,
+                          event.target.value
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor={`overrideTime-${post.id}`}>
+                      Override Time (Optional)
+                    </label>
+
+                    <input
+                      id={`overrideTime-${post.id}`}
+                      type="time"
+                      value={post.overrideTime || ""}
+                      onChange={(event) =>
+                        updateOverrideTime(
                           post.id,
                           event.target.value
                         )

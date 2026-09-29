@@ -2,6 +2,19 @@
 // TODO(Sprint 4): week/month view of projected slots, colored by platform.
 import { useEffect, useMemo, useState } from "react";
 
+function formatTime(time) {
+  if (!time) return "";
+
+  const [hourString, minute] = time.split(":");
+  let hour = Number(hourString);
+
+  const period = hour >= 12 ? "PM" : "AM";
+
+  hour = hour % 12 || 12;
+
+  return `${hour}:${minute} ${period}`;
+}
+
 const defaultTimes = {
   facebook: "12:00 PM",
   instagram: "10:00 AM",
@@ -94,7 +107,7 @@ export default function Schedule() {
     .map((post) => ({
       ...post,
       date: post.overrideDate,
-      time: defaultTimes[post.platform] || "",
+      time: formatTime(post.overrideTime) || defaultTimes[post.platform] || "",
     }));
 
   const unscheduledPosts = posts.filter(
@@ -152,6 +165,23 @@ const calendarTitle =
         month: "long",
         year: "numeric",
       });
+
+function removeScheduledPost(id) {
+  const updatedPosts = posts.filter(
+    (post) => post.id !== id
+  );
+
+  setPosts(updatedPosts);
+
+  localStorage.setItem(
+    "ctrPosts",
+    JSON.stringify(updatedPosts)
+  );
+
+  if (selectedPost?.id === id) {
+    setSelectedPost(null);
+  }
+}
 
   return (
     <section>
@@ -262,6 +292,7 @@ const calendarTitle =
                         <span>{post.time}</span>
 
                         <p>{post.caption}</p>
+                        
                       </div>
                     ))
                   )}
@@ -341,14 +372,23 @@ const calendarTitle =
           <div className="post-details-header">
             <h2>Post Details</h2>
 
-            <button
-              type="button"
-              onClick={() => setSelectedPost(null)}
-            >
-              Close
-            </button>
-          </div>
+            <div className="post-detail-actions">
+              <button
+                type="button"
+                className="remove-button"
+                onClick={() => removeScheduledPost(selectedPost.id)}
+              >
+                Remove
+              </button>
 
+              <button
+                type="button"
+                onClick={() => setSelectedPost(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
           <p>
             <strong>Platform:</strong>{" "}
             {capitalizePlatform(selectedPost.platform)}

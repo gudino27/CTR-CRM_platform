@@ -7,19 +7,32 @@ export default function Composer() {
   const [image, setImage] = useState(null);
   const [priority, setPriority] = useState("normal");
   const [overrideDate, setOverrideDate] = useState("");
+  const [overrideTime, setOverrideTime] = useState("");
   const [message, setMessage] = useState("");
 
   function handleSubmit(event) {
     event.preventDefault();
 
+    if (
+      !platform ||
+      !caption.trim() ||
+      !overrideDate ||
+      !overrideTime
+    ) {
+      setMessage(
+        "Please select a platform, enter a caption, date, and time."
+      );
+      return;
+    }
     const newPost = {
       id: Date.now(),
       platform,
-      caption,
+      caption: caption.trim(),
       hashtags,
       imageName: image ? image.name : "",
       priority,
       overrideDate: overrideDate || "",
+      overrideTime: overrideTime || "",
       status: "queued",
     };
 
@@ -41,6 +54,7 @@ export default function Composer() {
     setImage(null);
     setPriority("normal");
     setOverrideDate("");
+    setOverrideTime("");
 
     event.target.reset();
   }
@@ -127,7 +141,7 @@ export default function Composer() {
 
         <div>
           <label htmlFor="overrideDate">
-            Override Date (Optional)
+            Override Date
           </label>
 
           <input
@@ -137,6 +151,23 @@ export default function Composer() {
             onChange={(event) =>
               setOverrideDate(event.target.value)
             }
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="overrideTime">
+            Override Time
+          </label>
+
+          <input
+            id="overrideTime"
+            type="time"
+            value={overrideTime}
+            onChange={(event) =>
+              setOverrideTime(event.target.value)
+            }
+            required
           />
         </div>
 
