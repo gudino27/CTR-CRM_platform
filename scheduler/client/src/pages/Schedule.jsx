@@ -1,108 +1,407 @@
 // Deliverable 3: projected calendar of upcoming posts, mirrored to Google Calendar.
 // TODO(Sprint 4): week/month view of projected slots, colored by platform.
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const projectedPosts = [
-  {
-    id: 1,
-    platform: "facebook",
-    caption: "Thank you to our amazing volunteers!",
-    date: "2026-09-28",
-    time: "12:00 PM",
-  },
-  {
-    id: 2,
-    platform: "instagram",
-    caption: "Making meaningful connections every week.",
-    date: "2026-09-29",
-    time: "10:00 AM",
-  },
-  {
-    id: 3,
-    platform: "linkedin",
-    caption: "Learn more about Conversations to Remember.",
-    date: "2026-09-30",
-    time: "9:00 AM",
-  },
-  {
-    id: 4,
-    platform: "facebook",
-    caption: "Meet one of our student volunteers.",
-    date: "2026-10-02",
-    time: "12:00 PM",
-  },
-];
+const defaultTimes = {
+  facebook: "12:00 PM",
+  instagram: "10:00 AM",
+  linkedin: "9:00 AM",
+};
+
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDayName(date) {
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+  });
+}
+
+function getPlatformClass(platform) {
+  return `schedule-post ${platform}`;
+}
+
+function capitalizePlatform(platform) {
+  return platform.charAt(0).toUpperCase() + platform.slice(1);
+}
 
 export default function Schedule() {
   const [view, setView] = useState("week");
+  const [posts, setPosts] = useState([]);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  const formatDate = (date) => {
-    return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+  useEffect(() => {
+    const savedPosts =
+      JSON.parse(localStorage.getItem("ctrPosts")) || [];
+
+    setPosts(savedPosts);
+  }, []);
+
+  const today = currentDate;
+
+  const weekDays = useMemo(() => {
+    const currentDay = today.getDay();
+
+    const mondayOffset =
+      currentDay === 0 ? -6 : 1 - currentDay;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+
+      return date;
     });
-  };
+  }, [currentDate]);
+
+
+
+  const monthDays = useMemo(() => {
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    const leadingBlankCount =
+      (firstDay.getDay() + 6) % 7;
+
+    const leadingBlanks = Array.from(
+      { length: leadingBlankCount },
+      () => null
+    );
+
+    const actualDays = Array.from(
+      { length: totalDays },
+      (_, index) =>
+        new Date(year, month, index + 1)
+    );
+
+    return [...leadingBlanks, ...actualDays];
+  }, [currentDate]);
+
+
+  const scheduledPosts = posts
+    .filter((post) => post.overrideDate)
+    .map((post) => ({
+      ...post,
+      date: post.overrideDate,
+      time: defaultTimes[post.platform] || "",
+    }));
+
+  const unscheduledPosts = posts.filter(
+    (post) => !post.overrideDate
+  );
+
+  function goPrevious() {
+  setSelectedPost(null);
+
+  setCurrentDate((current) => {
+    const newDate = new Date(current);
+
+    if (view === "week") {
+      newDate.setDate(newDate.getDate() - 7);
+    } else {
+      newDate.setMonth(newDate.getMonth() - 1);
+    }
+
+    return newDate;
+  });
+}
+
+function goNext() {
+  setSelectedPost(null);
+
+  setCurrentDate((current) => {
+    const newDate = new Date(current);
+
+    if (view === "week") {
+      newDate.setDate(newDate.getDate() + 7);
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+
+    return newDate;
+  });
+}
+
+function goToday() {
+  setSelectedPost(null);
+  setCurrentDate(new Date());
+}
+
+const calendarTitle =
+  view === "week"
+    ? `${weekDays[0].toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })} - ${weekDays[6].toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })}`
+    : currentDate.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
 
   return (
     <section>
-      <h1>Schedule</h1>
+      <div className="schedule-header">
+        <div>
+          <h1>Schedule</h1>
+          <p>Projected posting calendar</p>
+        </div>
 
-      <div>
-        <button
-          type="button"
-          onClick={() => setView("week")}
-          disabled={view === "week"}
-        >
-          Week
-        </button>
+        <div className="schedule-controls">
+          <div className="calendar-navigation">
+            <button type="button" onClick={goPrevious}>
+              Previous
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setView("month")}
-          disabled={view === "month"}
-        >
-          Month
-        </button>
+            <button type="button" onClick={goToday}>
+              Today
+            </button>
+
+            <button type="button" onClick={goNext}>
+              Next
+            </button>
+          </div>
+
+          <div className="view-toggle">
+            <button
+              type="button"
+              onClick={() => setView("week")}
+              className={view === "week" ? "active-view" : ""}
+            >
+              Week
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setView("month")}
+              className={view === "month" ? "active-view" : ""}
+            >
+              Month
+            </button>
+          </div>
+        </div>
       </div>
 
-      <p>
-        View: <strong>{view === "week" ? "Week" : "Month"}</strong>
-      </p>
+      <h2 className="calendar-title">
+        {calendarTitle}
+      </h2>
 
-      <h2>Projected Posts</h2>
+      <div className="schedule-legend">
+        <span className="legend-item facebook-dot">
+          Facebook
+        </span>
 
-      {projectedPosts.length === 0 ? (
-        <p>No projected posts.</p>
+        <span className="legend-item instagram-dot">
+          Instagram
+        </span>
+
+        <span className="legend-item linkedin-dot">
+          LinkedIn
+        </span>
+      </div>
+
+      {view === "week" ? (
+        <div className="week-grid">
+          {weekDays.map((date) => {
+            const dateKey = formatDateKey(date);
+
+            const postsForDay =
+              scheduledPosts.filter(
+                (post) => post.date === dateKey
+              );
+
+            return (
+              <div
+                className="day-column"
+                key={dateKey}
+              >
+                <div className="day-heading">
+                  <strong>
+                    {formatDayName(date)}
+                  </strong>
+
+                  <span>{date.getDate()}</span>
+                </div>
+
+                <div className="day-content">
+                  {postsForDay.length === 0 ? (
+                    <p className="empty-slot">
+                      No posts
+                    </p>
+                  ) : (
+                    postsForDay.map((post) => (
+                      <div
+                        className={getPlatformClass(
+                          post.platform
+                        )}
+                            key={post.id}
+                            onClick={() => setSelectedPost(post)}
+                            role="button"
+                            tabIndex={0}
+                      >
+                        <strong>
+                          {capitalizePlatform(
+                            post.platform
+                          )}
+                        </strong>
+
+                        <span>{post.time}</span>
+
+                        <p>{post.caption}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        projectedPosts.map((post) => (
-          <div key={post.id}>
-            <h3>
-              {post.platform.charAt(0).toUpperCase() +
-                post.platform.slice(1)}
-            </h3>
+        
+      <div className="month-calendar">
+        <div className="month-weekdays">
+          <div>Mon</div>
+          <div>Tue</div>
+          <div>Wed</div>
+          <div>Thu</div>
+          <div>Fri</div>
+          <div>Sat</div>
+          <div>Sun</div>
+        </div>
 
-            <p>
-              <strong>Date:</strong> {formatDate(post.date)}
-            </p>
+        <div className="month-grid">
+          {monthDays.map((date, index) => {
+            if (!date) {
+              return (
+                <div
+                  className="month-day month-day-empty"
+                  key={`empty-${index}`}
+                />
+              );
+            }
 
-            <p>
-              <strong>Time:</strong> {post.time}
-            </p>
+            const dateKey = formatDateKey(date);
 
-            <p>
-              <strong>Post:</strong> {post.caption}
-            </p>
+            const postsForDay =
+              scheduledPosts.filter(
+                (post) => post.date === dateKey
+              );
 
-            <hr />
-          </div>
-        ))
+            return (
+              <div
+                className="month-day"
+                key={dateKey}
+              >
+                <div className="month-day-number">
+                  {date.getDate()}
+                </div>
+
+                {postsForDay.map((post) => (
+                  <div
+                    className={getPlatformClass(
+                      post.platform
+                    )}
+                    key={post.id}
+                    onClick={() => setSelectedPost(post)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <strong>
+                      {capitalizePlatform(
+                        post.platform
+                      )}
+                    </strong>
+
+                    <span>{post.time}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
       )}
 
-      <p>
-        These are projected posting times. Google Calendar synchronization
-        will use the scheduler backend.
+      {selectedPost && (
+        <div className="post-details">
+          <div className="post-details-header">
+            <h2>Post Details</h2>
+
+            <button
+              type="button"
+              onClick={() => setSelectedPost(null)}
+            >
+              Close
+            </button>
+          </div>
+
+          <p>
+            <strong>Platform:</strong>{" "}
+            {capitalizePlatform(selectedPost.platform)}
+          </p>
+
+          <p>
+            <strong>Date:</strong> {selectedPost.date}
+          </p>
+
+          <p>
+            <strong>Time:</strong> {selectedPost.time}
+          </p>
+
+          <p>
+            <strong>Priority:</strong>{" "}
+            {selectedPost.priority === "high"
+              ? "High"
+              : "Normal"}
+          </p>
+
+          <p>
+            <strong>Caption:</strong>{" "}
+            {selectedPost.caption}
+          </p>
+
+          {selectedPost.hashtags && (
+            <p>
+              <strong>Hashtags:</strong>{" "}
+              {selectedPost.hashtags}
+            </p>
+          )}
+
+          {selectedPost.imageName && (
+            <p>
+              <strong>Image:</strong>{" "}
+              {selectedPost.imageName}
+            </p>
+          )}
+        </div>
+      )}
+
+      {unscheduledPosts.length > 0 && (
+        <p className="schedule-note">
+          {unscheduledPosts.length} queued post
+          {unscheduledPosts.length !== 1 ? "s" : ""} waiting
+          for the scheduler to assign projected posting slots.
+        </p>
+      )}
+
+      <p className="schedule-note">
+        Posts with override dates are shown immediately.
+        Automatic projected scheduling and Google Calendar
+        synchronization will use the scheduler backend.
       </p>
     </section>
   );

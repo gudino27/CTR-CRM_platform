@@ -1,5 +1,3 @@
-// Deliverable 1: platform, caption, hashtags, image -> platform queue.
-// TODO(Sprint 4): form, character count per platform limit, image select/upload, submit to POST /api/posts.
 import { useState } from "react";
 
 export default function Composer() {
@@ -9,20 +7,42 @@ export default function Composer() {
   const [image, setImage] = useState(null);
   const [priority, setPriority] = useState("normal");
   const [overrideDate, setOverrideDate] = useState("");
+  const [message, setMessage] = useState("");
 
   function handleSubmit(event) {
     event.preventDefault();
 
-    const post = {
+    const newPost = {
+      id: Date.now(),
       platform,
       caption,
       hashtags,
-      image,
+      imageName: image ? image.name : "",
       priority,
-      overrideDate: overrideDate || null,
+      overrideDate: overrideDate || "",
+      status: "queued",
     };
 
-    console.log("Post submitted:", post);
+    const savedPosts =
+      JSON.parse(localStorage.getItem("ctrPosts")) || [];
+
+    const updatedPosts = [...savedPosts, newPost];
+
+    localStorage.setItem(
+      "ctrPosts",
+      JSON.stringify(updatedPosts)
+    );
+
+    setMessage("Post added to queue.");
+
+    setPlatform("");
+    setCaption("");
+    setHashtags("");
+    setImage(null);
+    setPriority("normal");
+    setOverrideDate("");
+
+    event.target.reset();
   }
 
   return (
@@ -30,7 +50,6 @@ export default function Composer() {
       <h1>Compose</h1>
 
       <form onSubmit={handleSubmit}>
-        {/* Platform */}
         <div>
           <label htmlFor="platform">Platform</label>
 
@@ -47,7 +66,6 @@ export default function Composer() {
           </select>
         </div>
 
-        {/* Caption */}
         <div>
           <label htmlFor="caption">Caption</label>
 
@@ -63,7 +81,6 @@ export default function Composer() {
           <p>Characters: {caption.length}</p>
         </div>
 
-        {/* Hashtags */}
         <div>
           <label htmlFor="hashtags">Hashtags</label>
 
@@ -76,7 +93,6 @@ export default function Composer() {
           />
         </div>
 
-        {/* Image */}
         <div>
           <label htmlFor="image">Image</label>
 
@@ -89,24 +105,26 @@ export default function Composer() {
             }
           />
 
-          {image && <p>Selected image: {image.name}</p>}
+          {image && (
+            <p>Selected image: {image.name}</p>
+          )}
         </div>
 
-        {/* Priority */}
         <div>
           <label htmlFor="priority">Priority</label>
 
           <select
             id="priority"
             value={priority}
-            onChange={(event) => setPriority(event.target.value)}
+            onChange={(event) =>
+              setPriority(event.target.value)
+            }
           >
             <option value="normal">Normal</option>
             <option value="high">High</option>
           </select>
         </div>
 
-        {/* Optional Override Date */}
         <div>
           <label htmlFor="overrideDate">
             Override Date (Optional)
@@ -116,14 +134,17 @@ export default function Composer() {
             id="overrideDate"
             type="date"
             value={overrideDate}
-            onChange={(event) => setOverrideDate(event.target.value)}
+            onChange={(event) =>
+              setOverrideDate(event.target.value)
+            }
           />
         </div>
 
-        {/* Submit */}
         <button type="submit">
           Add to Queue
         </button>
+
+        {message && <p>{message}</p>}
       </form>
     </section>
   );

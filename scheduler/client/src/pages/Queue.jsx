@@ -1,115 +1,121 @@
-// Deliverable 2: per-platform queue with priority and ordering.
-// TODO(Sprint 4): list per platform, reorder, priority toggle, override date.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialPosts = [
-  {
-    id: 1,
-    platform: "facebook",
-    caption: "Thank you to our amazing volunteers!",
-    hashtags: "#volunteer #community",
-    priority: "normal",
-    overrideDate: "",
-  },
-  {
-    id: 2,
-    platform: "facebook",
-    caption: "Meet one of our student volunteers.",
-    hashtags: "#volunteer #CTR",
-    priority: "high",
-    overrideDate: "",
-  },
-  {
-    id: 3,
-    platform: "instagram",
-    caption: "Making meaningful connections every week.",
-    hashtags: "#community #seniors",
-    priority: "normal",
-    overrideDate: "",
-  },
-  {
-    id: 4,
-    platform: "linkedin",
-    caption: "Learn more about Conversations to Remember.",
-    hashtags: "#nonprofit #community",
-    priority: "normal",
-    overrideDate: "",
-  },
+const platforms = [
+  "facebook",
+  "instagram",
+  "linkedin",
 ];
 
-const platforms = ["facebook", "instagram", "linkedin"];
-
 export default function Queue() {
-  const [posts, setPosts] = useState(initialPosts);
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    const savedPosts =
+      JSON.parse(localStorage.getItem("ctrPosts")) || [];
+
+    setPosts(savedPosts);
+  }, []);
+
+  function savePosts(updatedPosts) {
+    setPosts(updatedPosts);
+
+    localStorage.setItem(
+      "ctrPosts",
+      JSON.stringify(updatedPosts)
+    );
+  }
 
   function togglePriority(id) {
-    setPosts((currentPosts) =>
-      currentPosts.map((post) =>
-        post.id === id
-          ? {
-              ...post,
-              priority: post.priority === "high" ? "normal" : "high",
-            }
-          : post
-      )
+    const updatedPosts = posts.map((post) =>
+      post.id === id
+        ? {
+            ...post,
+            priority:
+              post.priority === "high"
+                ? "normal"
+                : "high",
+          }
+        : post
     );
+
+    savePosts(updatedPosts);
   }
 
   function updateOverrideDate(id, date) {
-    setPosts((currentPosts) =>
-      currentPosts.map((post) =>
-        post.id === id
-          ? {
-              ...post,
-              overrideDate: date,
-            }
-          : post
-      )
+    const updatedPosts = posts.map((post) =>
+      post.id === id
+        ? {
+            ...post,
+            overrideDate: date,
+          }
+        : post
     );
+
+    savePosts(updatedPosts);
   }
 
   function movePost(id, direction) {
-    setPosts((currentPosts) => {
-      const updatedPosts = [...currentPosts];
-      const currentIndex = updatedPosts.findIndex((post) => post.id === id);
+    const updatedPosts = [...posts];
 
-      if (currentIndex === -1) {
-        return currentPosts;
-      }
+    const currentIndex = updatedPosts.findIndex(
+      (post) => post.id === id
+    );
 
-      const currentPost = updatedPosts[currentIndex];
+    if (currentIndex === -1) {
+      return;
+    }
 
-      const platformIndexes = updatedPosts
-        .map((post, index) =>
-          post.platform === currentPost.platform ? index : -1
-        )
-        .filter((index) => index !== -1);
+    const currentPost = updatedPosts[currentIndex];
 
-      const position = platformIndexes.indexOf(currentIndex);
+    const platformIndexes = updatedPosts
+      .map((post, index) =>
+        post.platform === currentPost.platform
+          ? index
+          : -1
+      )
+      .filter((index) => index !== -1);
 
-      if (direction === "up" && position > 0) {
-        const targetIndex = platformIndexes[position - 1];
+    const position =
+      platformIndexes.indexOf(currentIndex);
 
-        [updatedPosts[currentIndex], updatedPosts[targetIndex]] = [
-          updatedPosts[targetIndex],
-          updatedPosts[currentIndex],
-        ];
-      }
+    if (direction === "up" && position > 0) {
+      const targetIndex =
+        platformIndexes[position - 1];
 
-      if (
-        direction === "down" &&
-        position < platformIndexes.length - 1
-      ) {
-        const targetIndex = platformIndexes[position + 1];
+      [
+        updatedPosts[currentIndex],
+        updatedPosts[targetIndex],
+      ] = [
+        updatedPosts[targetIndex],
+        updatedPosts[currentIndex],
+      ];
+    }
 
-        [updatedPosts[currentIndex], updatedPosts[targetIndex]] = [
-          updatedPosts[targetIndex],
-          updatedPosts[currentIndex],
-        ];
-      }
+    if (
+      direction === "down" &&
+      position < platformIndexes.length - 1
+    ) {
+      const targetIndex =
+        platformIndexes[position + 1];
 
-      return updatedPosts;
-    });
+      [
+        updatedPosts[currentIndex],
+        updatedPosts[targetIndex],
+      ] = [
+        updatedPosts[targetIndex],
+        updatedPosts[currentIndex],
+      ];
+    }
+
+    savePosts(updatedPosts);
+  }
+
+  function removePost(id) {
+    const updatedPosts = posts.filter(
+      (post) => post.id !== id
+    );
+
+    savePosts(updatedPosts);
   }
 
   return (
@@ -124,7 +130,8 @@ export default function Queue() {
         return (
           <div key={platform}>
             <h2>
-              {platform.charAt(0).toUpperCase() + platform.slice(1)}
+              {platform.charAt(0).toUpperCase() +
+                platform.slice(1)}
             </h2>
 
             {platformPosts.length === 0 ? (
@@ -136,25 +143,40 @@ export default function Queue() {
                     #{index + 1} — {post.caption}
                   </h3>
 
-                  <p>{post.hashtags}</p>
+                  {post.hashtags && (
+                    <p>{post.hashtags}</p>
+                  )}
+
+                  {post.imageName && (
+                    <p>
+                      <strong>Image:</strong>{" "}
+                      {post.imageName}
+                    </p>
+                  )}
 
                   <p>
                     Priority:{" "}
                     <strong>
-                      {post.priority === "high" ? "High" : "Normal"}
+                      {post.priority === "high"
+                        ? "High"
+                        : "Normal"}
                     </strong>
                   </p>
 
                   <button
                     type="button"
-                    onClick={() => togglePriority(post.id)}
+                    onClick={() =>
+                      togglePriority(post.id)
+                    }
                   >
                     Toggle Priority
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => movePost(post.id, "up")}
+                    onClick={() =>
+                      movePost(post.id, "up")
+                    }
                     disabled={index === 0}
                   >
                     Move Up
@@ -162,21 +184,39 @@ export default function Queue() {
 
                   <button
                     type="button"
-                    onClick={() => movePost(post.id, "down")}
-                    disabled={index === platformPosts.length - 1}
+                    onClick={() =>
+                      movePost(post.id, "down")
+                    }
+                    disabled={
+                      index ===
+                      platformPosts.length - 1
+                    }
                   >
                     Move Down
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removePost(post.id)
+                    }
+                  >
+                    Remove
+                  </button>
+
                   <div>
-                    <label htmlFor={`overrideDate-${post.id}`}>
+                    <label
+                      htmlFor={`overrideDate-${post.id}`}
+                    >
                       Override Date (Optional)
                     </label>
 
                     <input
                       id={`overrideDate-${post.id}`}
                       type="date"
-                      value={post.overrideDate}
+                      value={
+                        post.overrideDate || ""
+                      }
                       onChange={(event) =>
                         updateOverrideDate(
                           post.id,
