@@ -1,62 +1,107 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api.js";
+import { formatDateTime, priorityLabels } from "../time.js";
 
 export default function Composer() {
-  const [platform, setPlatform] = useState("");
+  const [platforms, setPlatforms] = useState([]);
+  const [timezone, setTimezone] = useState();
+  const [platformId, setPlatformId] = useState("");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
-  const [image, setImage] = useState(null);
-  const [priority, setPriority] = useState("normal");
+  const [image, setImage] = useState(null); // { file, previewUrl, media, uploading, error }
+  const [altText, setAltText] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [priority, setPriority] = useState("0");
   const [overrideDate, setOverrideDate] = useState("");
-  const [overrideTime, setOverrideTime] = useState("");
   const [message, setMessage] = useState("");
+  const fileInput = useRef(null);
 
-  function handleSubmit(event) {
+  useEffect(() => {
+    api.platforms()
+      .then((all) => setPlatforms(all.filter((platform) => platform.enabled)))
+      .catch((error) => setMessage(error.message));
+    api.status().then((status) => setTimezone(status.timezone)).catch(() => {});
+  }, []);
+
+  // Free the preview's object URL when the image changes or the page closes
+  useEffect(() => () => image && URL.revokeObjectURL(image.previewUrl), [image?.previewUrl]);
+
+  const platform = platforms.find((p) => p.id === Number(platformId));
+  const postLength = caption.trim().length + (hashtags.trim() ? hashtags.trim().length + 2 : 0);
+  const atLimit = Boolean(platform?.charLimit && postLength >= platform.charLimit);
+  const overLimit = Boolean(platform?.charLimit && postLength > platform.charLimit);
+  const postingTime = platform ? [...platform.postingTimes].sort()[0] : null;
+
+  // Uploads as soon as an image is chosen, so submit only has to send the media id
+  async function chooseImage(file) {
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setImage({ file, previewUrl, media: null, uploading: true, error: "" });
+
+    try {
+      const media = await api.uploadMedia(file);
+      setImage((current) => current?.previewUrl === previewUrl ? { ...current, media, uploading: false } : current);
+    } catch (error) {
+      setImage((current) => current?.previewUrl === previewUrl ? { ...current, uploading: false, error: error.message } : current);
+    }
+  }
+
+  function removeImage() {
+    setImage(null);
+    setAltText("");
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  function handleDrop(event) {
+    event.preventDefault();
+    setDragging(false);
+    chooseImage(event.dataTransfer.files?.[0]);
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    if (
-      !platform ||
-      !caption.trim() ||
-      !overrideDate ||
-      !overrideTime
-    ) {
-      setMessage(
-        "Please select a platform, enter a caption, date, and time."
-      );
+    if (!platform || !caption.trim()) {
+      setMessage("Please select a platform and enter a caption.");
       return;
     }
-    const newPost = {
-      id: Date.now(),
-      platform,
-      caption: caption.trim(),
-      hashtags,
-      imageName: image ? image.name : "",
-      priority,
-      overrideDate: overrideDate || "",
-      overrideTime: overrideTime || "",
-      status: "queued",
-    };
+    if (image?.uploading) {
+      setMessage("Please wait for the image to finish uploading.");
+      return;
+    }
+    if (image && !image.media) {
+      setMessage("The image did not upload. Remove it or choose another.");
+      return;
+    }
 
-    const savedPosts =
-      JSON.parse(localStorage.getItem("ctrPosts")) || [];
+    try {
+      const post = await api.createPost({
+        platformId: platform.id,
+        caption,
+        hashtags,
+        mediaId: image?.media.id ?? null,
+        altText,
+        priority: Number(priority),
+        // Next posts always go out the next day, so they carry no override
+        overrideDate: priority !== "2" && overrideDate ? overrideDate : null,
+      });
 
-    const updatedPosts = [...savedPosts, newPost];
+      setMessage(
+        post.scheduledAt
+          ? `Post added to the ${platform.name} queue for ${formatDateTime(post.scheduledAt, timezone)}`
+          : `Post added to the ${platform.name} queue. No posting slot is available yet`
+      );
+    } catch (error) {
+      setMessage(error.message);
+      return;
+    }
 
-    localStorage.setItem(
-      "ctrPosts",
-      JSON.stringify(updatedPosts)
-    );
-
-    setMessage("Post added to queue.");
-
-    setPlatform("");
+    setPlatformId("");
     setCaption("");
     setHashtags("");
-    setImage(null);
-    setPriority("normal");
+    removeImage();
+    setPriority("0");
     setOverrideDate("");
-    setOverrideTime("");
-
-    event.target.reset();
   }
 
   return (
@@ -69,14 +114,16 @@ export default function Composer() {
 
           <select
             id="platform"
-            value={platform}
-            onChange={(event) => setPlatform(event.target.value)}
+            value={platformId}
+            onChange={(event) => setPlatformId(event.target.value)}
             required
           >
             <option value="">Select a platform</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-            <option value="linkedin">LinkedIn</option>
+            {platforms.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -92,7 +139,12 @@ export default function Composer() {
             required
           />
 
-          <p>Characters: {caption.length}</p>
+          <p className={atLimit ? "error-text" : undefined}>
+            Characters (with hashtags): {postLength}
+            {platform?.charLimit ? ` / ${platform.charLimit}` : ""}
+            {overLimit ? ` (${postLength - platform.charLimit} over ${platform.name}'s limit)` : ""}
+            {atLimit && !overLimit ? " (at the limit)" : ""}
+          </p>
         </div>
 
         <div>
@@ -110,19 +162,62 @@ export default function Composer() {
         <div>
           <label htmlFor="image">Image</label>
 
+          <div
+            className={`drop-zone${dragging ? " drop-zone-active" : ""}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInput.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") fileInput.current?.click();
+            }}
+          >
+            {image ? (
+              <img className="drop-zone-preview" src={image.previewUrl} alt={altText || image.file.name} />
+            ) : (
+              <p>Drag an image here, or click to choose one (JPEG, PNG or WebP)</p>
+            )}
+          </div>
+
           <input
             id="image"
+            ref={fileInput}
             type="file"
-            accept="image/*"
-            onChange={(event) =>
-              setImage(event.target.files?.[0] || null)
-            }
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => chooseImage(event.target.files?.[0])}
           />
 
           {image && (
-            <p>Selected image: {image.name}</p>
+            <p>
+              {image.uploading && `Uploading ${image.file.name}...`}
+              {image.media && `Uploaded ${image.file.name}.`}
+              {image.error && <span className="error-text">{image.error}</span>}{" "}
+              <button type="button" onClick={removeImage}>
+                Remove image
+              </button>
+            </p>
           )}
         </div>
+
+        {image && (
+          <div>
+            <label htmlFor="altText">Alt Text</label>
+
+            <input
+              id="altText"
+              type="text"
+              value={altText}
+              onChange={(event) => setAltText(event.target.value)}
+              placeholder="Describe the image for people using screen readers"
+            />
+          </div>
+        )}
 
         <div>
           <label htmlFor="priority">Priority</label>
@@ -134,14 +229,17 @@ export default function Composer() {
               setPriority(event.target.value)
             }
           >
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
+            {Object.entries(priorityLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
         </div>
 
         <div>
           <label htmlFor="overrideDate">
-            Override Date
+            Override Date (Optional)
           </label>
 
           <input
@@ -151,27 +249,16 @@ export default function Composer() {
             onChange={(event) =>
               setOverrideDate(event.target.value)
             }
-            required
+            disabled={priority === "2"}
           />
+
+          <p className="field-hint">
+            Leave empty to use the next open slot
+            {postingTime && ` ${platform.name} posts at ${postingTime}.`}
+          </p>
         </div>
 
-        <div>
-          <label htmlFor="overrideTime">
-            Override Time
-          </label>
-
-          <input
-            id="overrideTime"
-            type="time"
-            value={overrideTime}
-            onChange={(event) =>
-              setOverrideTime(event.target.value)
-            }
-            required
-          />
-        </div>
-
-        <button type="submit">
+        <button type="submit" disabled={overLimit || image?.uploading}>
           Add to Queue
         </button>
 

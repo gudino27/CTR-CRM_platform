@@ -21,4 +21,4 @@ scheduler/node_modules
 scheduler/*/node_modules
 scheduler/client/dist
 scheduler/.env
-scheduler/data/
+scheduler/**/data/

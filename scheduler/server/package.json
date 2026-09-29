@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@googleapis/calendar": "^20.0.0",
+    "@googleapis/drive": "^26.0.1",
     "express": "^5.2.1"
   }
 }

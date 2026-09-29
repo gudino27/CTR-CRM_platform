@@ -5,8 +5,12 @@ services:
     env_file: .env
     environment:
       DB_PATH: /data/scheduler.db
+      # Inside the container the app always uses 3000; PORT in .env only picks the host port
+      PORT: "3000"
+      # Set by `npm run share` to the tunnel's public URL
+      APP_URL: ${APP_URL:-http://localhost:3000}
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     volumes:
       - scheduler-data:/data
     restart: unless-stopped

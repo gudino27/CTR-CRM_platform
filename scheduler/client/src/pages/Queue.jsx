@@ -1,265 +1,292 @@
 import { useEffect, useState } from "react";
-
-const platforms = [
-  "facebook",
-  "instagram",
-  "linkedin",
-];
+import { api } from "../api.js";
+import { formatDateTime, priorityLabels } from "../time.js";
 
 export default function Queue() {
+  const [platforms, setPlatforms] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [failedPosts, setFailedPosts] = useState([]);
+  const [timezone, setTimezone] = useState();
+  const [editing, setEditing] = useState(null); // { id, caption, hashtags, altText }
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    const [allPlatforms, queuedPosts, failed, status] = await Promise.all([
+      api.platforms(),
+      api.posts("queued"),
+      api.posts("failed"),
+      api.status(),
+    ]);
+    setPlatforms(allPlatforms);
+    setPosts(queuedPosts);
+    setFailedPosts(failed);
+    setTimezone(status.timezone);
+  }
 
   useEffect(() => {
-    const savedPosts =
-      JSON.parse(localStorage.getItem("ctrPosts")) || [];
-
-    setPosts(savedPosts);
+    load().catch((error) => setMessage(error.message));
   }, []);
 
-  function savePosts(updatedPosts) {
-    setPosts(updatedPosts);
-
-    localStorage.setItem(
-      "ctrPosts",
-      JSON.stringify(updatedPosts)
-    );
-  }
-
-  function togglePriority(id) {
-    const updatedPosts = posts.map((post) =>
-      post.id === id
-        ? {
-            ...post,
-            priority:
-              post.priority === "high"
-                ? "normal"
-                : "high",
-          }
-        : post
-    );
-
-    savePosts(updatedPosts);
-  }
-
-  function updateOverrideDate(id, date) {
-    const updatedPosts = posts.map((post) =>
-      post.id === id
-        ? {
-            ...post,
-            overrideDate: date,
-          }
-        : post
-    );
-
-    savePosts(updatedPosts);
-  }
-
-  function updateOverrideTime(id, time) {
-    const updatedPosts = posts.map((post) =>
-      post.id === id
-        ? {
-            ...post,
-            overrideTime: time,
-          }
-        : post
-    );
-
-    savePosts(updatedPosts);
-  }
-
-  function movePost(id, direction) {
-    const updatedPosts = [...posts];
-
-    const currentIndex = updatedPosts.findIndex(
-      (post) => post.id === id
-    );
-
-    if (currentIndex === -1) {
-      return;
+  // Every change reprojects the whole queue on the server, so reload afterwards
+  async function run(action) {
+    try {
+      await action();
+      setMessage("");
+      return true;
+    } catch (error) {
+      setMessage(error.message);
+      return false;
+    } finally {
+      await load().catch((error) => setMessage(error.message));
     }
-
-    const currentPost = updatedPosts[currentIndex];
-
-    const platformIndexes = updatedPosts
-      .map((post, index) =>
-        post.platform === currentPost.platform
-          ? index
-          : -1
-      )
-      .filter((index) => index !== -1);
-
-    const position =
-      platformIndexes.indexOf(currentIndex);
-
-    if (direction === "up" && position > 0) {
-      const targetIndex =
-        platformIndexes[position - 1];
-
-      [
-        updatedPosts[currentIndex],
-        updatedPosts[targetIndex],
-      ] = [
-        updatedPosts[targetIndex],
-        updatedPosts[currentIndex],
-      ];
-    }
-
-    if (
-      direction === "down" &&
-      position < platformIndexes.length - 1
-    ) {
-      const targetIndex =
-        platformIndexes[position + 1];
-
-      [
-        updatedPosts[currentIndex],
-        updatedPosts[targetIndex],
-      ] = [
-        updatedPosts[targetIndex],
-        updatedPosts[currentIndex],
-      ];
-    }
-
-    savePosts(updatedPosts);
   }
 
-  function removePost(id) {
-    const updatedPosts = posts.filter(
-      (post) => post.id !== id
-    );
-
-    savePosts(updatedPosts);
+  function updatePriority(post, priority) {
+    run(() => api.updatePost(post.id, { priority }));
   }
+
+  function updateOverrideDate(post, overrideDate) {
+    run(() => api.updatePost(post.id, { overrideDate: overrideDate || null }));
+  }
+
+  // Reordering only works among posts of the same priority without an override date
+  function movePost(post, direction) {
+    run(() => api.movePost(post.id, direction));
+  }
+
+  function removePost(post) {
+    run(() => api.deletePost(post.id));
+  }
+
+  function requeuePost(post) {
+    run(() => api.requeuePost(post.id));
+  }
+
+  async function saveEdit() {
+    const { id, ...changes } = editing;
+    if (await run(() => api.updatePost(id, changes))) setEditing(null);
+  }
+
+  const platformName = (id) => platforms.find((p) => p.id === id)?.name ?? "Unknown";
 
   return (
     <section>
       <h1>Queue</h1>
 
+      {message && <p className="error-text">{message}</p>}
+
+      {failedPosts.length > 0 && (
+        <div>
+          <h2>Failed to send</h2>
+
+          {failedPosts.map((post) => (
+            <div key={post.id}>
+              <h3>
+                {platformName(post.platformId)} — {post.caption}
+              </h3>
+
+              <p className="error-text">{post.lastError}</p>
+
+              <p>
+                Was due {post.scheduledAt ? formatDateTime(post.scheduledAt, timezone) : "unknown"}.
+                Requeueing puts it at the front of the {platformName(post.platformId)} queue.
+              </p>
+
+              <button type="button" onClick={() => requeuePost(post)}>
+                Requeue
+              </button>
+
+              <button type="button" onClick={() => removePost(post)}>
+                Remove
+              </button>
+
+              <hr />
+            </div>
+          ))}
+        </div>
+      )}
+
       {platforms.map((platform) => {
         const platformPosts = posts.filter(
-          (post) => post.platform === platform
+          (post) => post.platformId === platform.id
         );
 
         return (
-          <div key={platform}>
+          <div key={platform.id}>
             <h2>
-              {platform.charAt(0).toUpperCase() +
-                platform.slice(1)}
+              {platform.name}
+              {platform.paused ? " (paused)" : ""}
             </h2>
 
             {platformPosts.length === 0 ? (
               <p>No posts in queue.</p>
             ) : (
-              platformPosts.map((post, index) => (
-                <div key={post.id}>
-                  <h3>
-                    #{index + 1} — {post.caption}
-                  </h3>
+              platformPosts.map((post, index) => {
+                const sameGroup = platformPosts.filter(
+                  (p) => !p.overrideDate && p.priority === post.priority
+                );
+                const groupIndex = sameGroup.indexOf(post);
+                const isEditing = editing?.id === post.id;
 
-                  {post.hashtags && (
-                    <p>{post.hashtags}</p>
-                  )}
+                return (
+                  <div key={post.id}>
+                    {isEditing ? (
+                      <div>
+                        <label htmlFor={`caption-${post.id}`}>Caption</label>
+                        <textarea
+                          id={`caption-${post.id}`}
+                          rows="4"
+                          value={editing.caption}
+                          onChange={(event) => setEditing({ ...editing, caption: event.target.value })}
+                        />
 
-                  {post.imageName && (
+                        <label htmlFor={`hashtags-${post.id}`}>Hashtags</label>
+                        <input
+                          id={`hashtags-${post.id}`}
+                          type="text"
+                          value={editing.hashtags}
+                          onChange={(event) => setEditing({ ...editing, hashtags: event.target.value })}
+                        />
+
+                        {post.mediaId && (
+                          <>
+                            <label htmlFor={`altText-${post.id}`}>Alt Text</label>
+                            <input
+                              id={`altText-${post.id}`}
+                              type="text"
+                              value={editing.altText}
+                              onChange={(event) => setEditing({ ...editing, altText: event.target.value })}
+                            />
+                          </>
+                        )}
+
+                        <button type="button" onClick={saveEdit}>
+                          Save
+                        </button>
+
+                        <button type="button" onClick={() => setEditing(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <h3>
+                          #{index + 1} — {post.caption}
+                        </h3>
+
+                        {post.hashtags && (
+                          <p>{post.hashtags}</p>
+                        )}
+                      </>
+                    )}
+
+                    {post.mediaLink && (
+                      <p>
+                        <strong>Image:</strong>{" "}
+                        <a href={post.mediaLink} target="_blank" rel="noreferrer">
+                          {post.mediaName}
+                        </a>
+                        {post.altText && ` (alt text: ${post.altText})`}
+                      </p>
+                    )}
+
                     <p>
-                      <strong>Image:</strong>{" "}
-                      {post.imageName}
+                      Scheduled:{" "}
+                      <strong>
+                        {post.scheduledAt
+                          ? formatDateTime(post.scheduledAt, timezone)
+                          : "No slot available"}
+                      </strong>
+                      {post.priority === 2
+                        ? " (next day)"
+                        : post.overrideDate
+                          ? " (override date)"
+                          : ""}
                     </p>
-                  )}
 
-                  <p>
-                    Priority:{" "}
-                    <strong>
-                      {post.priority === "high"
-                        ? "High"
-                        : "Normal"}
-                    </strong>
-                  </p>
+                    <div>
+                      <label htmlFor={`priority-${post.id}`}>
+                        Priority
+                      </label>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      togglePriority(post.id)
-                    }
-                  >
-                    Toggle Priority
-                  </button>
+                      <select
+                        id={`priority-${post.id}`}
+                        value={post.priority}
+                        onChange={(event) =>
+                          updatePriority(post, Number(event.target.value))
+                        }
+                      >
+                        {Object.entries(priorityLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      movePost(post.id, "up")
-                    }
-                    disabled={index === 0}
-                  >
-                    Move Up
-                  </button>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditing({ id: post.id, caption: post.caption, hashtags: post.hashtags, altText: post.altText })
+                        }
+                      >
+                        Edit
+                      </button>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      movePost(post.id, "down")
-                    }
-                    disabled={
-                      index ===
-                      platformPosts.length - 1
-                    }
-                  >
-                    Move Down
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      removePost(post.id)
-                    }
-                  >
-                    Remove
-                  </button>
-
-                  <div>
-                    <label
-                      htmlFor={`overrideDate-${post.id}`}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        movePost(post, "up")
+                      }
+                      disabled={groupIndex <= 0}
                     >
-                      Override Date (Optional)
-                    </label>
+                      Move Up
+                    </button>
 
-                    <input
-                      id={`overrideDate-${post.id}`}
-                      type="date"
-                      value={
-                        post.overrideDate || ""
+                    <button
+                      type="button"
+                      onClick={() =>
+                        movePost(post, "down")
                       }
-                      onChange={(event) =>
-                        updateOverrideDate(
-                          post.id,
-                          event.target.value
-                        )
+                      disabled={groupIndex === -1 || groupIndex === sameGroup.length - 1}
+                    >
+                      Move Down
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removePost(post)
                       }
-                    />
+                    >
+                      Remove
+                    </button>
+
+                    <div>
+                      <label htmlFor={`overrideDate-${post.id}`}>
+                        Override Date (Optional)
+                      </label>
+
+                      <input
+                        id={`overrideDate-${post.id}`}
+                        type="date"
+                        value={post.overrideDate ?? ""}
+                        disabled={post.priority === 2}
+                        onChange={(event) =>
+                          updateOverrideDate(
+                            post,
+                            event.target.value
+                          )
+                        }
+                      />
+                    </div>
+
+                    <hr />
                   </div>
-
-                  <div>
-                    <label htmlFor={`overrideTime-${post.id}`}>
-                      Override Time (Optional)
-                    </label>
-
-                    <input
-                      id={`overrideTime-${post.id}`}
-                      type="time"
-                      value={post.overrideTime || ""}
-                      onChange={(event) =>
-                        updateOverrideTime(
-                          post.id,
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <hr />
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         );

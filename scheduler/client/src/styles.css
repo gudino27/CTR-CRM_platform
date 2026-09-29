@@ -346,6 +346,7 @@ section > div label:has(input[type="checkbox"]) {
 
 .schedule-legend {
   display: flex;
+  flex-wrap: wrap; /* more platforms than fit on one line */
   gap: 22px;
   margin-bottom: 20px;
   font-size: 14px;
@@ -359,18 +360,8 @@ section > div label:has(input[type="checkbox"]) {
   height: 10px;
   margin-right: 7px;
   border-radius: 50%;
-}
-
-.facebook-dot::before {
-  background: #2563eb;
-}
-
-.instagram-dot::before {
-  background: #9333ea;
-}
-
-.linkedin-dot::before {
-  background: #16a34a;
+  /* Set per platform from its Google Calendar color */
+  background: var(--legend-color);
 }
 
 .week-grid {
@@ -429,18 +420,6 @@ section > div label:has(input[type="checkbox"]) {
 .schedule-post p {
   margin: 4px 0 0;
   font-size: 13px;
-}
-
-.schedule-post.facebook {
-  border-left-color: #2563eb;
-}
-
-.schedule-post.instagram {
-  border-left-color: #9333ea;
-}
-
-.schedule-post.linkedin {
-  border-left-color: #16a34a;
 }
 
 .month-grid {
@@ -560,6 +539,7 @@ section > div label:has(input[type="checkbox"]) {
 
 .schedule-controls {
   display: flex;
+  flex-wrap: wrap; /* Week/Month drops below the navigation on phones */
   align-items: center;
   gap: 16px;
 }
@@ -583,4 +563,43 @@ section > div label:has(input[type="checkbox"]) {
   padding: 0;
   border: 0;
   font-size: 20px;
+}
+.error-text {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* ========================================
+   Composer Image Upload
+   ======================================== */
+
+.drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  padding: 16px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop-zone-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.drop-zone-preview {
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 6px;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
 }

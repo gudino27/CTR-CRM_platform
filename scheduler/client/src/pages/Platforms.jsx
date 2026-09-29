@@ -1,62 +1,38 @@
 // Deliverable 2: posting days, times, and calendar color per platform.
-// TODO(Sprint 4): editable settings that trigger a projection recalculation.
+// Saving reprojects each platform's queue and updates its calendar events.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api.js";
+import { calendarColors } from "../calendarColors.js";
 
-const initialPlatforms = [
-  {
-    id: 1,
-    name: "Facebook",
-    postingDays: ["Monday", "Wednesday", "Friday"],
-    postingTime: "12:00",
-    calendarColor: "Blue",
-  },
-  {
-    id: 2,
-    name: "Instagram",
-    postingDays: ["Tuesday", "Thursday"],
-    postingTime: "10:00",
-    calendarColor: "Purple",
-  },
-  {
-    id: 3,
-    name: "LinkedIn",
-    postingDays: ["Monday", "Wednesday"],
-    postingTime: "09:00",
-    calendarColor: "Green",
-  },
-];
-
+// API day codes with the labels shown on the page
 const days = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
-
-const calendarColors = [
-  "Blue",
-  "Green",
-  "Purple",
-  "Red",
-  "Yellow",
-  "Orange",
+  ["MON", "Monday"],
+  ["TUE", "Tuesday"],
+  ["WED", "Wednesday"],
+  ["THU", "Thursday"],
+  ["FRI", "Friday"],
+  ["SAT", "Saturday"],
+  ["SUN", "Sunday"],
 ];
 
 export default function Platforms() {
-  const [platforms, setPlatforms] = useState(initialPlatforms);
+  const [platforms, setPlatforms] = useState([]);
   const [savedMessage, setSavedMessage] = useState("");
 
-  function updatePostingTime(id, postingTime) {
+  useEffect(() => {
+    api.platforms()
+      .then(setPlatforms)
+      .catch((error) => setSavedMessage(error.message));
+  }, []);
+
+  function updatePlatform(id, changes) {
     setPlatforms((currentPlatforms) =>
       currentPlatforms.map((platform) =>
         platform.id === id
           ? {
               ...platform,
-              postingTime,
+              ...changes,
             }
           : platform
       )
@@ -65,47 +41,42 @@ export default function Platforms() {
     setSavedMessage("");
   }
 
-  function updateCalendarColor(id, calendarColor) {
-    setPlatforms((currentPlatforms) =>
-      currentPlatforms.map((platform) =>
-        platform.id === id
-          ? {
-              ...platform,
-              calendarColor,
-            }
-          : platform
-      )
-    );
-
-    setSavedMessage("");
+  // Only the first posting time is editable here; any extra times are kept
+  function updatePostingTime(platform, postingTime) {
+    updatePlatform(platform.id, {
+      postingTimes: [postingTime, ...platform.postingTimes.slice(1)],
+    });
   }
 
-  function togglePostingDay(id, day) {
-    setPlatforms((currentPlatforms) =>
-      currentPlatforms.map((platform) => {
-        if (platform.id !== id) {
-          return platform;
-        }
+  function togglePostingDay(platform, day) {
+    const dayIsSelected = platform.postingDays.includes(day);
 
-        const dayIsSelected = platform.postingDays.includes(day);
-
-        return {
-          ...platform,
-          postingDays: dayIsSelected
-            ? platform.postingDays.filter(
-                (postingDay) => postingDay !== day
-              )
-            : [...platform.postingDays, day],
-        };
-      })
-    );
-
-    setSavedMessage("");
+    updatePlatform(platform.id, {
+      postingDays: dayIsSelected
+        ? platform.postingDays.filter(
+            (postingDay) => postingDay !== day
+          )
+        : [...platform.postingDays, day],
+    });
   }
 
-  function handleSave() {
-    console.log("Platform settings:", platforms);
-    setSavedMessage("Platform settings saved.");
+  async function handleSave() {
+    try {
+      const saved = await Promise.all(
+        platforms.map((platform) =>
+          api.updatePlatform(platform.id, {
+            postingDays: platform.postingDays,
+            postingTimes: platform.postingTimes.filter(Boolean),
+            calendarColorId: platform.calendarColorId,
+          })
+        )
+      );
+
+      setPlatforms(saved);
+      setSavedMessage("Platform settings saved. Queues have been rescheduled.");
+    } catch (error) {
+      setSavedMessage(error.message);
+    }
   }
 
   return (
@@ -123,17 +94,17 @@ export default function Platforms() {
           <div>
             <strong>Posting Days</strong>
 
-            {days.map((day) => (
+            {days.map(([day, label]) => (
               <label key={day}>
                 <input
                   type="checkbox"
                   checked={platform.postingDays.includes(day)}
                   onChange={() =>
-                    togglePostingDay(platform.id, day)
+                    togglePostingDay(platform, day)
                   }
                 />
 
-                {day}
+                {label}
               </label>
             ))}
           </div>
@@ -146,10 +117,10 @@ export default function Platforms() {
             <input
               id={`postingTime-${platform.id}`}
               type="time"
-              value={platform.postingTime}
+              value={platform.postingTimes[0] ?? ""}
               onChange={(event) =>
                 updatePostingTime(
-                  platform.id,
+                  platform,
                   event.target.value
                 )
               }
@@ -163,17 +134,17 @@ export default function Platforms() {
 
             <select
               id={`calendarColor-${platform.id}`}
-              value={platform.calendarColor}
+              value={platform.calendarColorId ?? ""}
               onChange={(event) =>
-                updateCalendarColor(
-                  platform.id,
-                  event.target.value
-                )
+                updatePlatform(platform.id, {
+                  calendarColorId: event.target.value || null,
+                })
               }
             >
-              {calendarColors.map((color) => (
-                <option key={color} value={color}>
-                  {color}
+              <option value="">Calendar default</option>
+              {Object.entries(calendarColors).map(([id, color]) => (
+                <option key={id} value={id}>
+                  {color.name}
                 </option>
               ))}
             </select>

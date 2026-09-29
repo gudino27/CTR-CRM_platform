@@ -1,25 +1,8 @@
 // Deliverable 3: projected calendar of upcoming posts, mirrored to Google Calendar.
-// TODO(Sprint 4): week/month view of projected slots, colored by platform.
 import { useEffect, useMemo, useState } from "react";
-
-function formatTime(time) {
-  if (!time) return "";
-
-  const [hourString, minute] = time.split(":");
-  let hour = Number(hourString);
-
-  const period = hour >= 12 ? "PM" : "AM";
-
-  hour = hour % 12 || 12;
-
-  return `${hour}:${minute} ${period}`;
-}
-
-const defaultTimes = {
-  facebook: "12:00 PM",
-  instagram: "10:00 AM",
-  linkedin: "9:00 AM",
-};
+import { api } from "../api.js";
+import { platformColor } from "../calendarColors.js";
+import { formatTime, priorityLabels, zonedParts } from "../time.js";
 
 function formatDateKey(date) {
   const year = date.getFullYear();
@@ -35,26 +18,49 @@ function formatDayName(date) {
   });
 }
 
-function getPlatformClass(platform) {
-  return `schedule-post ${platform}`;
-}
-
-function capitalizePlatform(platform) {
-  return platform.charAt(0).toUpperCase() + platform.slice(1);
-}
 
 export default function Schedule() {
   const [view, setView] = useState("week");
   const [posts, setPosts] = useState([]);
+  const [platforms, setPlatforms] = useState([]);
+  const [timezone, setTimezone] = useState();
+  const [appNow, setAppNow] = useState(new Date());
   const [selectedPost, setSelectedPost] = useState(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    const [queuedPosts, allPlatforms, status] = await Promise.all([
+      // Sent posts stay on the calendar so the team can see what went out
+      api.posts("queued,sending,posted,failed"),
+      api.platforms(),
+      api.status(),
+    ]);
+    setPosts(queuedPosts);
+    setPlatforms(allPlatforms);
+    setTimezone(status.timezone);
+    // In test mode the app clock can be moved, so "today" comes from the server
+    setAppNow(new Date(status.now));
+    return status;
+  }
 
   useEffect(() => {
-    const savedPosts =
-      JSON.parse(localStorage.getItem("ctrPosts")) || [];
-
-    setPosts(savedPosts);
+    load()
+      .then((status) => setCurrentDate(new Date(status.now)))
+      .catch((error) => setMessage(error.message));
   }, []);
+
+  const platformById = new Map(
+    platforms.map((platform) => [platform.id, platform])
+  );
+
+  function platformName(post) {
+    return platformById.get(post.platformId)?.name ?? "Unknown";
+  }
+
+  function platformStyle(post) {
+    return { borderLeftColor: platformColor(platformById.get(post.platformId)) };
+  }
 
   const today = currentDate;
 
@@ -103,15 +109,16 @@ export default function Schedule() {
 
 
   const scheduledPosts = posts
-    .filter((post) => post.overrideDate)
+    .filter((post) => post.scheduledAt)
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
     .map((post) => ({
       ...post,
-      date: post.overrideDate,
-      time: formatTime(post.overrideTime) || defaultTimes[post.platform] || "",
+      date: zonedParts(post.scheduledAt, timezone).date,
+      time: formatTime(post.scheduledAt, timezone),
     }));
 
   const unscheduledPosts = posts.filter(
-    (post) => !post.overrideDate
+    (post) => !post.scheduledAt
   );
 
   function goPrevious() {
@@ -148,7 +155,7 @@ function goNext() {
 
 function goToday() {
   setSelectedPost(null);
-  setCurrentDate(new Date());
+  setCurrentDate(appNow);
 }
 
 const calendarTitle =
@@ -166,21 +173,20 @@ const calendarTitle =
         year: "numeric",
       });
 
-function removeScheduledPost(id) {
-  const updatedPosts = posts.filter(
-    (post) => post.id !== id
-  );
-
-  setPosts(updatedPosts);
-
-  localStorage.setItem(
-    "ctrPosts",
-    JSON.stringify(updatedPosts)
-  );
+async function removeScheduledPost(id) {
+  try {
+    await api.deletePost(id);
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message);
+    return;
+  }
 
   if (selectedPost?.id === id) {
     setSelectedPost(null);
   }
+
+  await load().catch((error) => setMessage(error.message));
 }
 
   return (
@@ -230,18 +236,18 @@ function removeScheduledPost(id) {
         {calendarTitle}
       </h2>
 
+      {message && <p className="error-text">{message}</p>}
+
       <div className="schedule-legend">
-        <span className="legend-item facebook-dot">
-          Facebook
-        </span>
-
-        <span className="legend-item instagram-dot">
-          Instagram
-        </span>
-
-        <span className="legend-item linkedin-dot">
-          LinkedIn
-        </span>
+        {platforms.map((platform) => (
+          <span
+            className="legend-item"
+            key={platform.id}
+            style={{ "--legend-color": platformColor(platform) }}
+          >
+            {platform.name}
+          </span>
+        ))}
       </div>
 
       {view === "week" ? (
@@ -275,18 +281,15 @@ function removeScheduledPost(id) {
                   ) : (
                     postsForDay.map((post) => (
                       <div
-                        className={getPlatformClass(
-                          post.platform
-                        )}
-                            key={post.id}
-                            onClick={() => setSelectedPost(post)}
-                            role="button"
-                            tabIndex={0}
+                        className="schedule-post"
+                        style={platformStyle(post)}
+                        key={post.id}
+                        onClick={() => setSelectedPost(post)}
+                        role="button"
+                        tabIndex={0}
                       >
                         <strong>
-                          {capitalizePlatform(
-                            post.platform
-                          )}
+                          {platformName(post)}
                         </strong>
 
                         <span>{post.time}</span>
@@ -343,18 +346,15 @@ function removeScheduledPost(id) {
 
                 {postsForDay.map((post) => (
                   <div
-                    className={getPlatformClass(
-                      post.platform
-                    )}
+                    className="schedule-post"
+                    style={platformStyle(post)}
                     key={post.id}
                     onClick={() => setSelectedPost(post)}
                     role="button"
                     tabIndex={0}
                   >
                     <strong>
-                      {capitalizePlatform(
-                        post.platform
-                      )}
+                      {platformName(post)}
                     </strong>
 
                     <span>{post.time}</span>
@@ -373,13 +373,15 @@ function removeScheduledPost(id) {
             <h2>Post Details</h2>
 
             <div className="post-detail-actions">
-              <button
-                type="button"
-                className="remove-button"
-                onClick={() => removeScheduledPost(selectedPost.id)}
-              >
-                Remove
-              </button>
+              {selectedPost.status === "queued" && (
+                <button
+                  type="button"
+                  className="remove-button"
+                  onClick={() => removeScheduledPost(selectedPost.id)}
+                >
+                  Remove
+                </button>
+              )}
 
               <button
                 type="button"
@@ -391,7 +393,7 @@ function removeScheduledPost(id) {
           </div>
           <p>
             <strong>Platform:</strong>{" "}
-            {capitalizePlatform(selectedPost.platform)}
+            {platformName(selectedPost)}
           </p>
 
           <p>
@@ -400,13 +402,16 @@ function removeScheduledPost(id) {
 
           <p>
             <strong>Time:</strong> {selectedPost.time}
+            {selectedPost.priority === 2
+              ? " (next day)"
+              : selectedPost.overrideDate
+                ? " (override date)"
+                : ""}
           </p>
 
           <p>
             <strong>Priority:</strong>{" "}
-            {selectedPost.priority === "high"
-              ? "High"
-              : "Normal"}
+            {priorityLabels[selectedPost.priority]}
           </p>
 
           <p>
@@ -421,27 +426,35 @@ function removeScheduledPost(id) {
             </p>
           )}
 
-          {selectedPost.imageName && (
+          {selectedPost.mediaLink && (
             <p>
               <strong>Image:</strong>{" "}
-              {selectedPost.imageName}
+              <a href={selectedPost.mediaLink} target="_blank" rel="noreferrer">
+                {selectedPost.mediaName}
+              </a>
+              {selectedPost.altText && ` (alt text: ${selectedPost.altText})`}
             </p>
           )}
+
+          <p>
+            <strong>Status:</strong> {selectedPost.status}
+            {selectedPost.lastError && ` — ${selectedPost.lastError}`}
+          </p>
         </div>
       )}
 
       {unscheduledPosts.length > 0 && (
         <p className="schedule-note">
           {unscheduledPosts.length} queued post
-          {unscheduledPosts.length !== 1 ? "s" : ""} waiting
-          for the scheduler to assign projected posting slots.
+          {unscheduledPosts.length !== 1 ? "s" : ""} have no
+          posting slot. Check that the platform has posting days
+          and a time, and is not paused.
         </p>
       )}
 
       <p className="schedule-note">
-        Posts with override dates are shown immediately.
-        Automatic projected scheduling and Google Calendar
-        synchronization will use the scheduler backend.
+        Each post appears in Google Calendar at the time shown here.
+        Times are in {timezone ?? "the app time zone"}.
       </p>
     </section>
   );

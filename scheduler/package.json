@@ -6,10 +6,11 @@
   "workspaces": ["server", "client"],
   "engines": { "node": ">=22.13" },
   "scripts": {
-    "dev": "npm run dev --workspace server & npm run dev --workspace client",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace client",
     "start": "npm start --workspace server",
     "test": "npm test --workspace server",
-    "db:seed": "npm run seed --workspace server"
+    "db:seed": "npm run seed --workspace server",
+    "share": "node scripts/share.mjs"
   }
 }
