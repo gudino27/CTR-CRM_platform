@@ -20,5 +20,36 @@ export function formatDateTime(iso, timeZone) {
   });
 }
 
-// Post priority as stored by the API
-export const priorityLabels = { 0: 'Standard', 1: 'High', 2: 'Next (posts tomorrow)' };
+// Wall-clock "HH:MM" as "9:30 AM", with no time zone conversion
+export function formatClock(time) {
+  const [hours, minutes] = time.split(':').map(Number);
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
+/** A fixedAt string ("YYYY-MM-DDTHH:MM", already in the app time zone) for display. */
+export function formatLocal(fixedAt) {
+  const [date, time] = fixedAt.split('T');
+  const [year, month, day] = date.split('-').map(Number);
+  const label = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-US', {
+    timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric',
+  });
+  return `${label}, ${formatClock(time)}`;
+}
+
+// createdAt comes from SQLite's datetime('now'): "YYYY-MM-DD HH:MM:SS" in UTC
+export function formatDate(createdAt, timeZone) {
+  if (!createdAt) return '';
+  const iso = createdAt.includes('T') ? createdAt : `${createdAt.replace(' ', 'T')}Z`;
+  return new Date(iso).toLocaleDateString('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** "YYYY-MM" for the app's current month. */
+export function monthKey(iso, timeZone) {
+  return zonedParts(iso, timeZone).date.slice(0, 7);
+}
+
+export function shiftMonth(month, delta) {
+  const [year, m] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, m - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}

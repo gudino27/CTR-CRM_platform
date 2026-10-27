@@ -74,3 +74,17 @@ export function offsetIso(date, timeZone) {
   const abs = Math.abs(offsetMinutes);
   return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}:${pad(p.second)}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
 }
+
+/** Validates a local "YYYY-MM-DDTHH:MM" (a fixed post's fixedAt) and returns its instant in timeZone, or null. */
+
+export function parseLocalDateTime(value, timeZone) {
+  const m = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(typeof value === 'string' ? value : '');
+  if (!m || !parseDateString(m[1])) return null;
+  return atLocalTime(m[1], `${m[2]}:${m[3]}`, timeZone);
+}
+
+/** Local "YYYY-MM-DDTHH:MM" of an instant in timeZone (the fixedAt format). */
+export function localDateTimeString(date, timeZone) {
+  const p = partsIn(date, timeZone);
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+}

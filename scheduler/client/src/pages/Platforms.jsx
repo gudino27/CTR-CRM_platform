@@ -1,5 +1,5 @@
 // Deliverable 2: posting days, times, and calendar color per platform.
-// Saving reprojects each platform's queue and updates its calendar events.
+// Saving regenerates each platform's future, unlocked slots and updates its calendar events.
 
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
@@ -25,6 +25,11 @@ export default function Platforms() {
       .then(setPlatforms)
       .catch((error) => setSavedMessage(error.message));
   }, []);
+
+  // Post type edits save right away and return the whole platform
+  function replacePlatform(saved) {
+    setPlatforms((current) => current.map((p) => (p.id === saved.id ? saved : p)));
+  }
 
   function updatePlatform(id, changes) {
     setPlatforms((currentPlatforms) =>
@@ -73,7 +78,7 @@ export default function Platforms() {
       );
 
       setPlatforms(saved);
-      setSavedMessage("Platform settings saved. Queues have been rescheduled.");
+      setSavedMessage("Platform settings saved. Future unlocked slots have been regenerated.");
     } catch (error) {
       setSavedMessage(error.message);
     }
@@ -150,6 +155,8 @@ export default function Platforms() {
             </select>
           </div>
 
+          <PostTypeEditor platform={platform} onChange={replacePlatform} />
+
           <hr />
         </div>
       ))}
@@ -160,5 +167,97 @@ export default function Platforms() {
 
       {savedMessage && <p>{savedMessage}</p>}
     </section>
+  );
+}
+
+// Add, rename, or move a post type in or out of the monthly rotation.
+// Types outside the rotation (like Holiday) are only for Specific Date posts.
+function PostTypeEditor({ platform, onChange }) {
+  const [names, setNames] = useState({});
+  const [newName, setNewName] = useState("");
+  const [newInRotation, setNewInRotation] = useState(true);
+  const [message, setMessage] = useState("");
+  const types = [...(platform.postTypes ?? [])].sort(
+    (a, b) => Number(b.inRotation) - Number(a.inRotation) || a.sortOrder - b.sortOrder
+  );
+
+  async function save(type, changes) {
+    try {
+      onChange(await api.updatePostType(platform.id, type.id, changes));
+      setMessage("");
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function rename(type) {
+    const name = (names[type.id] ?? type.name).trim();
+    if (name && name !== type.name) await save(type, { name });
+    setNames((current) => ({ ...current, [type.id]: undefined }));
+  }
+
+  async function add(event) {
+    event.preventDefault();
+    if (!newName.trim()) return;
+    try {
+      onChange(await api.addPostType(platform.id, { name: newName.trim(), inRotation: newInRotation }));
+      setNewName("");
+      setNewInRotation(true);
+      setMessage("");
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  return (
+    <div>
+      <strong>Post Types</strong>
+
+      <ul className="post-type-list">
+        {types.map((type) => (
+          <li key={type.id}>
+            <input
+              type="text"
+              aria-label={`Rename ${type.name}`}
+              value={names[type.id] ?? type.name}
+              onChange={(event) => setNames({ ...names, [type.id]: event.target.value })}
+              onBlur={() => rename(type)}
+              onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+            />
+            <label>
+              <input
+                type="checkbox"
+                checked={type.inRotation}
+                onChange={(event) => save(type, { inRotation: event.target.checked })}
+              />
+              In monthly rotation
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      <form className="post-type-add" onSubmit={add}>
+        <input
+          type="text"
+          aria-label="New post type name"
+          placeholder="New post type"
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+        />
+        <label>
+          <input type="checkbox" checked={newInRotation} onChange={(event) => setNewInRotation(event.target.checked)} />
+          In monthly rotation
+        </label>
+        <button type="submit">Add Post Type</button>
+      </form>
+
+      {message && <p className="error-text">{message}</p>}
+
+      <p className="field-hint">
+        Slots repeat the rotation types in this order
+        {platform.usesColors ? " and alternate Blue and Purple." : ". This platform does not use colors."}
+        {" "}Types outside the rotation, like Holiday, are for Specific Date posts.
+      </p>
+    </div>
   );
 }

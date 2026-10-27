@@ -4,9 +4,11 @@ import { config } from './config.js';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inventoryRouter } from './routes/inventory.js';
 import { mediaRouter } from './routes/media.js';
 import { platformsRouter } from './routes/platforms.js';
 import { postsRouter } from './routes/posts.js';
+import { slotsRouter } from './routes/slots.js';
 import { systemRouter } from './routes/system.js';
 import { testWebhookRouter } from './routes/testWebhook.js';
 
@@ -35,6 +37,8 @@ export function createApp(db) {
   app.use('/api', systemRouter(db));
   app.use('/api/platforms', platformsRouter(db));
   app.use('/api/posts', postsRouter(db));
+  app.use('/api/slots', slotsRouter(db));
+  app.use('/api', inventoryRouter(db));
   app.use('/api/test-webhook', testWebhookRouter(db));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

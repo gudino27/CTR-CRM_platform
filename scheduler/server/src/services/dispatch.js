@@ -7,8 +7,7 @@ import { serialized } from './lock.js';
 import { offsetIso } from './time.js';
 
 const TIMEOUT_MS = 10_000;
-const PRIORITIES = ['standard', 'high', 'next'];
-
+const KINDS = ['library', 'fixed'];
 export const testEndpointUrl = () => `${config.selfUrl}/api/test-webhook`;
 
 /**
@@ -32,12 +31,13 @@ export function buildPayload({ post, platform, media }) {
       ? [{ type: 'image', driveFileId: media.driveFileId ?? null, url: absoluteUrl(media.link), mimeType: media.mimeType, altText: post.altText }]
       : [],
     scheduledFor: offsetIso(new Date(post.scheduledAt), config.timezone),
-    priority: PRIORITIES[post.priority],
+    kind: post.kind,
+    postType: post.postTypeName ?? null,
+    color: post.color ?? null,
     createdBy: null, // team login arrives in Sprint 6
     callbackUrl: `${config.appUrl}/api/posts/${post.id}/status`,
   };
 }
-
 /** Problems with a received payload's shape; empty when it matches the contract. */
 export function payloadProblems(p) {
   const problems = [];
@@ -49,7 +49,10 @@ export function payloadProblems(p) {
   if (isString(p.scheduledFor) && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(p.scheduledFor)) {
     problems.push('scheduledFor must be ISO 8601 with a UTC offset');
   }
-  if (!PRIORITIES.includes(p.priority)) problems.push(`priority must be one of ${PRIORITIES.join(', ')}`);
+  if (!KINDS.includes(p.kind)) problems.push(`kind must be one of ${KINDS.join(', ')}`);
+  for (const key of ['postType', 'color']) {
+    if (p[key] !== null && !isString(p[key])) problems.push(`${key} must be a non-empty string or null`);
+  }
   if (!Array.isArray(p.media)) {
     problems.push('media must be a list');
   } else {
@@ -62,15 +65,14 @@ export function payloadProblems(p) {
   }
   return problems;
 }
-
 /** Sends every queued post whose slot has come. Returns the number handled. */
 export function dispatchDue(db) {
   return serialized(() => dispatchDueNow(db));
 }
-
 async function dispatchDueNow(db) {
   const now = clock.now().toISOString();
-  const due = db.prepare(`SELECT * FROM post WHERE status = 'queued' AND scheduledAt IS NOT NULL AND scheduledAt <= ?
+  const due = db.prepare(`SELECT post.*, postType.name AS postTypeName FROM post LEFT JOIN postType ON postType.id = post.postTypeId
+                          WHERE status = 'queued' AND scheduledAt IS NOT NULL AND scheduledAt <= ?
                           ORDER BY scheduledAt`).all(now);
   const platformById = db.prepare('SELECT * FROM platform WHERE id = ?');
   const mediaById = db.prepare('SELECT * FROM media WHERE id = ?');
@@ -113,12 +115,10 @@ async function dispatchDueNow(db) {
   }
   return due.length;
 }
-
 /**
  * A post left in 'sending' means the process stopped mid-request. It may or
  * may not have reached n8n, so it is marked failed for a person to check
- * rather than sent again.
- */
+ * rather than sent again. */
 export function failInterrupted(db) {
   db.prepare(`UPDATE post SET status = 'failed', lastError = ?, updatedAt = datetime('now') WHERE status = 'sending'`)
     .run('The app stopped while sending this post. Check whether it was published before requeueing it.');

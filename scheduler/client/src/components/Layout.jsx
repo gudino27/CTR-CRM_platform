@@ -3,8 +3,10 @@ import TestModeBanner from './TestModeBanner.jsx';
 
 const links = [
   ['/compose', 'Compose'],
-  ['/queue', 'Queue'],
-  ['/schedule', 'Schedule'],
+  ['/library', 'Library'],
+  ['/calendar', 'Calendar'],
+  ['/inventory', 'Inventory'],
+  ['/media', 'Media'],
   ['/platforms', 'Platforms'],
 ];
 

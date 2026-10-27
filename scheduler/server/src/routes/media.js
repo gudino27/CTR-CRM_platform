@@ -4,8 +4,9 @@ import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { config } from '../config.js';
-import { driveUploader } from '../services/googleDrive.js';
+import { driveDownloader, driveUploader } from '../services/googleDrive.js';
 import { extensions, imageInfo } from '../services/imageInfo.js';
+import { checkImage } from '../services/imageRules.js';
 
 // Local fallback for development when Drive isn't configured
 function localMediaDir() {
@@ -65,13 +66,60 @@ export function mediaRouter(db) {
     res.json(media);
   });
 
-  router.get('/:id/file', (req, res) => {
+  router.get('/:id/file', async (req, res) => {
     const media = byId.get(req.params.id);
     if (!media) return res.status(404).json({ error: 'Image not found' });
-    if (media.storage === 'drive') return res.redirect(302, media.link);
+    if (media.storage === 'drive') {
+      // ?inline=1 streams the bytes (for <img> thumbnails), otherwise send people to Drive
+      const download = req.query.inline ? driveDownloader() : null;
+      if (!download) return res.redirect(302, media.link);
+      try {
+        return res.type(media.mimeType).send(await download(media.driveFileId));
+      } catch (err) {
+        console.error('Drive download failed:', err);
+        return res.redirect(302, media.link);
+      }
+    }
     if (!media.localPath || !existsSync(media.localPath)) return res.status(404).json({ error: 'Image file is missing' });
     res.type(media.mimeType).sendFile(media.localPath);
   });
 
+  // Library listing: newest first, optional name search, with the posts that use each image.
+  router.get('/', (req, res) => {
+    const search = String(req.query.search ?? '').trim();
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+    // Escape LIKE wildcards so "100%" matches literally
+    const pattern = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const where = search ? "WHERE name LIKE ? ESCAPE '\\'" : '';
+    const args = search ? [pattern] : [];
+
+    const rows = db.prepare(`
+      SELECT id, name, mimeType, width, height, createdAt FROM media ${where}
+      ORDER BY createdAt DESC, id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+    const { total } = db.prepare(`SELECT COUNT(*) AS total FROM media ${where}`).get(...args);
+
+    // Only id, platformId, caption and mediaId, so post schema changes don't break the library
+    const usedBy = new Map(rows.map((row) => [row.id, []]));
+    if (rows.length) {
+      const posts = db.prepare(`
+        SELECT id, platformId, caption, mediaId FROM post
+        WHERE mediaId IN (${rows.map(() => '?').join(', ')}) ORDER BY id`).all(...rows.map((row) => row.id));
+      for (const post of posts) {
+        usedBy.get(post.mediaId)?.push({ postId: post.id, platformId: post.platformId, caption: post.caption });
+      }
+    }
+    res.set('X-Total-Count', String(total));
+    res.json(rows.map((row) => ({ ...row, link: `/api/media/${row.id}/file`, usedBy: usedBy.get(row.id) })));
+  });
+
+  router.get('/:id/check', (req, res) => {
+    const media = byId.get(req.params.id);
+    if (!media) return res.status(404).json({ error: 'Image not found' });
+    if (!req.query.platformId) return res.status(400).json({ error: 'platformId is required' });
+    const platform = db.prepare('SELECT name FROM platform WHERE id = ?').get(req.query.platformId);
+    if (!platform) return res.status(404).json({ error: 'Platform not found' });
+    res.json(checkImage(media, platform.name));
+  });
   return router;
 }

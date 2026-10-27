@@ -11,6 +11,7 @@
     "start": "npm start --workspace server",
     "test": "npm test --workspace server",
     "db:seed": "npm run seed --workspace server",
-    "share": "node scripts/share.mjs"
+    "share": "node scripts/share.mjs",
+    "google:token": "node --env-file=.env scripts/googleToken.mjs"
   }
 }
