@@ -1,0 +1,66 @@
+/* Blackout dates: the Platforms section, the Compose/Library warning, and the Calendar's grey days */
+.blackout-dates {
+  margin-bottom: 24px;
+}
+.blackout-list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.blackout-list li {
+  margin-bottom: 10px;
+}
+.blackout-form {
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.blackout-summary {
+  margin: 0 0 8px;
+}
+.blackout-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.blackout-row > div {
+  min-width: 150px;
+}
+.blackout-reason {
+  flex: 1 1 220px;
+}
+.blackout-reason input {
+  width: 100%;
+}
+.blackout-notice {
+  margin-top: 10px;
+  padding: 10px 14px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 6px;
+}
+.blackout-notice p {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+/* Calendar: a blackout day is greyed, with its reason */
+.month-day.month-day-blackout {
+  background: repeating-linear-gradient(-45deg, var(--color-surface-alt) 0 8px, var(--slot-none-bg) 8px 16px);
+}
+.month-day-blackout-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+.slot-blackout-flag {
+  color: var(--color-warning-text);
+  font-weight: 600;
+}
+.legend-blackout::before {
+  border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, var(--color-control-border) 0 2px, var(--slot-none-bg) 2px 4px);
+}

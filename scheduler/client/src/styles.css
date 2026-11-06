@@ -1,35 +1,39 @@
 /* CTR Social Scheduler */
-/* Palette: change the app's colors here */
+/* Palette: change the app's colors here.
+   Brand colors from conversationstoremember.org: purple #490E67, blue #175ABA, navy #192A3D,
+   beige #EFE9E7, pink #F5E3E0, red #BD1E1E, off-white #FAFBFC. Text pairs meet WCAG AA. */
 :root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-soft: #eff6ff;
-  --color-primary-light: #93c5fd;
+  --color-primary: #490e67;
+  --color-primary-hover: #175aba;
+  --color-primary-soft: #f5e3e0;
+  --color-primary-light: #a98bbd;
   --color-on-primary: #ffffff;
-  --color-link: #2f6fd6;
-  --color-heading: #111827;
-  --color-text: #1f2937;
-  --color-text-muted: #4b5563;
-  --color-label: #374151;
-  --color-badge-text: #334155;
-  --color-text-secondary: #475569;
-  --color-text-subtle: #64748b;
-  --color-text-faint: #94a3b8;
-  --color-bg: #f5f7fa;
+  --color-focus-ring: rgba(73, 14, 103, 0.18);
+  --color-link: #490e67;
+  --color-heading: #192a3d;
+  --color-text: #192a3d;
+  --color-text-muted: #3f4d5e;
+  --color-label: #192a3d;
+  --color-badge-text: #2c3b4d;
+  --color-text-secondary: #3f4d5e;
+  --color-text-subtle: #55616f;
+  --color-text-faint: #8c8380;
+  --color-bg: #efe9e7;
   --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-border: #dbe1e8;
-  --color-divider: #e2e8f0;
-  --color-control-border: #cbd5e1;
-  --color-secondary-bg: #e2e8f0;
-  --color-secondary-hover: #cbd5e1;
-  --color-danger: #dc2626;
-  --color-danger-strong: #b91c1c;
+  --color-surface-alt: #fafbfc;
+  --color-border: #ddd3cf;
+  --color-divider: #e9e2df;
+  --color-control-border: #8c8380;
+  --color-secondary-bg: #ffffff;
+  --color-secondary-hover: #f5e3e0;
+  --color-danger: #bd1e1e;
+  --color-danger-strong: #9a1818;
   --color-warning-text: #92400e;
   --color-warning-bg: #fef3c7;
   --color-warning-border: #fde68a;
   --color-success: #15803d;
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --radius-button: 999px; /* the site's pill buttons */
+  --shadow-card: 0 2px 8px rgba(25, 42, 61, 0.06);
   /* Library scheduling: Blue/Purple slots, Specific Date posts, low stock */
   --slot-blue: #2f6fd6;
   --slot-blue-bg: #e6efff;
@@ -41,7 +45,7 @@
   --slot-fixed: #b45309;
   --slot-fixed-bg: #fff4e0;
   --low: var(--color-danger-strong);
-  --low-bg: #fdecec;
+  --low-bg: #fbeaea;
 }
 * {
   box-sizing: border-box;
@@ -56,19 +60,43 @@ body {
 /* Navigation */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  min-height: 68px;
-  padding: 0 32px;
+  column-gap: 32px;
+  min-height: 76px;
+  padding: 10px 32px;
   background: var(--color-surface);
+  border-top: 4px solid var(--color-primary);
   border-bottom: 1px solid var(--color-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(25, 42, 61, 0.06);
 }
+/* The logo with "Social Scheduler" under it; links to Compose */
 .brand {
-  margin-right: 32px;
-  color: var(--color-heading);
-  font-size: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.brand-logo {
+  display: block;
+  width: auto;
+  height: 56px;
+}
+.brand-name {
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   white-space: nowrap;
+}
+.brand:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 nav {
   display: flex;
@@ -76,15 +104,21 @@ nav {
   gap: 24px;
 }
 nav a {
+  padding: 4px 0;
   color: var(--color-text-muted);
   text-decoration: none;
   font-size: 16px;
   font-weight: 600;
-  transition: color 0.2s ease;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
-nav a:hover,
+nav a:hover {
+  color: var(--color-primary-hover);
+}
+/* The current page: purple and underlined, so it isn't shown by color alone */
 nav a.active {
   color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 /* Main Content */
 main {
@@ -152,7 +186,7 @@ textarea {
 }
 input:focus,select:focus,textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 textarea {
   min-height: 150px;
@@ -197,11 +231,15 @@ button {
   cursor: pointer;
   background: var(--color-primary);
   border: none;
-  border-radius: 6px;
-  transition: background 0.2s ease, transform 0.1s ease;
+  border-radius: var(--radius-button);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.1s ease;
 }
 button:hover:not(:disabled) {
   background: var(--color-primary-hover);
+}
+button:focus-visible {
+  outline: 3px solid var(--color-primary-hover);
+  outline-offset: 2px;
 }
 button:active:not(:disabled) {
   transform: translateY(1px);
@@ -211,23 +249,29 @@ button:disabled {
   cursor: not-allowed;
   background: var(--color-secondary-bg);
 }
-/* Grey buttons: secondary actions, toggles, calendar navigation */
+/* Outlined buttons: secondary actions, toggles, calendar navigation */
 .secondary-button,
 .view-toggle button,
 .mode-toggle button,
 .calendar-navigation button {
-  color: var(--color-text-secondary);
+  color: var(--color-primary);
   background: var(--color-secondary-bg);
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
 }
-/* .view-toggle buttons keep the blue hover of a normal button */
 .secondary-button:hover:not(:disabled),.mode-toggle button:hover:not(:disabled),
-.calendar-navigation button:hover {
+.calendar-navigation button:hover:not(:disabled) {
   background: var(--color-secondary-hover);
+}
+/* .view-toggle buttons turn blue on hover like a normal button */
+.view-toggle button:hover:not(:disabled) {
+  color: var(--color-on-primary);
+  box-shadow: none;
 }
 /* The selected option in a toggle (after the hover rule, so it stays blue on hover) */
 .view-toggle button.active-view,.mode-toggle button.active-view,.mode-toggle button.active-view:hover {
   color: var(--color-on-primary);
   background: var(--color-primary);
+  box-shadow: none;
 }
 .remove-button {
   background: var(--color-danger);
@@ -235,7 +279,7 @@ button:disabled {
 .remove-button:hover {
   background: var(--color-danger-strong);
 }
-.link-button {
+.link-button,.link-button:hover:not(:disabled) {
   background: none;
   border: none;
   color: var(--color-link);
@@ -243,7 +287,8 @@ button:disabled {
   font: inherit;
   cursor: pointer;
 }
-.link-button:hover {
+.link-button:hover:not(:disabled) {
+  color: var(--color-primary-hover);
   text-decoration: underline;
 }
 /* Page Sections (Library, Platforms) */
@@ -289,10 +334,19 @@ section > div label:has(input[type="checkbox"]) {
 }
 /* Responsive Layout */
 @media (max-width: 700px) {
+  .topbar {
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 16px 4px;
+  }
+  .brand-logo {
+    height: 40px;
+  }
   nav {
     flex-wrap: wrap;
-    gap: 14px;
-    padding: 14px 20px;
+    justify-content: center;
+    gap: 6px 16px;
+    padding: 10px 0;
   }
   main {
     padding: 28px 18px 60px;
@@ -817,4 +871,530 @@ button.slot-ghost:hover:not(:disabled) {
     padding: 8px;
     font-size: 13px;
   }
+}
+/* Required fields, image preview, post editors, holiday posts */
+.required-star {
+  margin-left: 3px;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.optional-text {
+  color: var(--color-text-subtle);
+  font-weight: 400;
+}
+.required-legend {
+  margin-top: 10px;
+}
+.field-hint-strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.success-text {
+  color: var(--color-success);
+  font-weight: 600;
+}
+/* Image: original next to the converted JPEG */
+.image-field > .field-label {
+  margin-bottom: 10px;
+}
+.image-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.image-compare-single {
+  grid-template-columns: minmax(0, 320px);
+}
+.image-compare figure {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.image-compare img {
+  display: block;
+  width: 100%;
+  height: 200px;
+  object-fit: contain;
+  background: var(--color-surface);
+}
+/* A checkerboard behind the original shows where it was transparent */
+.image-compare img.image-checker {
+  background: repeating-conic-gradient(var(--color-divider) 0 25%, var(--color-surface) 0 50%) 0 0 / 16px 16px;
+}
+.image-compare figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.image-compare figcaption strong {
+  color: var(--color-text);
+}
+.drop-zone-compact {
+  min-height: 0;
+  padding: 10px 14px;
+}
+.drop-zone p {
+  margin: 0;
+  color: inherit;
+}
+.drop-zone:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.image-actions {
+  margin-top: 8px;
+}
+.image-alt {
+  margin-top: 12px;
+}
+/* Library cards show a small copy of the image */
+.library-image {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.library-image img {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+.edit-form .image-field {
+  margin-top: 12px;
+}
+/* Calendar: editing a post, adding a holiday post */
+.slot-panel-post {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-divider);
+}
+.slot-panel-post h3 {
+  margin-top: 0;
+}
+.post-editor {
+  max-width: 720px;
+}
+.post-editor > label,.post-editor > .field-label,.post-editor > .image-field,.post-editor > .date-time-row {
+  margin-top: 12px;
+}
+.post-editor > button {
+  margin-top: 14px;
+}
+.month-day-number {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+button.day-add {
+  margin: 0;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-primary-light);
+}
+button.day-add:hover:not(:disabled),button.day-add:focus-visible {
+  color: var(--color-on-primary);
+  background: var(--color-primary-hover);
+  box-shadow: none;
+}
+/* With a mouse, the day's + Holiday shows when pointing at the day */
+@media (hover: hover) {
+  .month-day button.day-add {
+    opacity: 0;
+  }
+  .month-day:hover button.day-add,.month-day button.day-add:focus-visible {
+    opacity: 1;
+  }
+}
+.inventory-months {
+  color: var(--color-text);
+}
+@media (max-width: 700px) {
+  .image-compare {
+    grid-template-columns: 1fr;
+  }
+  .image-compare-single {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Schedule rules editor on the Platforms page */
+.schedule-rule-list {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.schedule-rule {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.schedule-rule-inactive {
+  border-style: dashed;
+  opacity: 0.8;
+}
+.schedule-rule-summary {
+  margin: 0;
+  font-weight: 600;
+}
+.schedule-rule-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.schedule-rule-days legend {
+  padding: 0;
+  font-weight: 600;
+}
+.schedule-rule-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.schedule-rule-row input[type="number"] {
+  width: 5em;
+}
+.schedule-rule-sequence {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+.schedule-rule-sequence li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.schedule-rule-sequence li span {
+  min-width: 10em;
+}
+/* Users, permissions, activity and the temporary sign-in */
+.topbar nav {
+  flex-wrap: wrap;
+}
+.current-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 14px;
+}
+.current-user > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.current-user-role {
+  color: var(--color-text-subtle);
+  font-size: 13px;
+}
+.sign-in {
+  max-width: 560px;
+  text-align: center;
+}
+.sign-in-logo {
+  width: 260px;
+  height: auto;
+  margin-bottom: 16px;
+}
+.sign-in-temporary {
+  padding: 12px 16px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 8px;
+  text-align: left;
+}
+.sign-in-list {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+  padding: 0;
+  list-style: none;
+}
+.sign-in-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.user-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.user-form label {
+  display: flex;
+  flex-direction: column;
+  min-width: 12em;
+}
+.user-actions {
+  white-space: nowrap;
+}
+.user-actions button + button {
+  margin-left: 8px;
+}
+.user-inactive td {
+  color: var(--color-text-subtle);
+}
+.permissions-table th[scope="row"] {
+  font-weight: 500;
+  background: none;
+}
+.permissions-table td {
+  text-align: center;
+}
+.activity-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.activity-filter input {
+  width: 9em;
+}
+@media (max-width: 700px) {
+  .current-user {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Platforms page: pause switch and the drag-and-drop post type order */
+.platform-paused-badge {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  vertical-align: middle;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+}
+.platform-pause {
+  margin: 0 0 12px;
+}
+.platform-pause-on {
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+}
+.platform-pause-on p {
+  margin: 0 0 8px;
+}
+.schedule-rule-sequence .sequence-handle {
+  cursor: grab;
+  touch-action: none; /* lets a finger drag the item instead of scrolling the page */
+  min-width: 0;
+  user-select: none;
+  padding: 4px 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-text-subtle);
+}
+.schedule-rule-sequence li {
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.schedule-rule-sequence .sequence-item-dragging {
+  background: var(--color-primary-soft);
+  outline: 2px dashed var(--color-primary-light);
+}
+.sequence-item-dragging .sequence-handle {
+  cursor: grabbing;
+}
+.sequence-add-back {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+/* Bigger permission checkboxes, the session warning, sign-in notices */
+.permissions-table input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.permissions-table input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+.permissions-table input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.permissions-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.session-warning {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 20px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border-bottom: 1px solid var(--color-warning-border);
+  font-weight: 600;
+}
+.sign-in-notice {
+  padding: 12px 16px;
+  background: var(--color-primary-soft);
+  border-radius: 8px;
+}
+.setup-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The setup code form on the sign-in screen */
+.sign-in-code {
+  justify-content: center;
+  margin: 24px 0;
+}
+.sign-in-code p {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: left;
+}
+
+/* "Times are New York time" note, only for viewers in another zone */
+.time-zone-note {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+  color: var(--color-text-subtle);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* The slot panel's choice of which slots a new post type applies to */
+.type-scope {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+}
+.type-scope label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.type-scope label input {
+  margin-top: 3px;
+}
+.type-scope label .field-hint {
+  display: block;
+  margin: 2px 0 0;
+  font-weight: 400;
+}
+.type-scope-check {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+}
+
+/* ---- Permissions: warning before turning on a delete permission (pages/Permissions.jsx) ---- */
+.risky-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-danger-strong);
+}
+.risky-confirm {
+  margin-top: 16px;
+  padding: 16px;
+  max-width: 560px;
+  border: 1.5px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.risky-confirm input {
+  max-width: 240px;
+}
+
+/* ---- Calendar: week of the year at the start of each week row (pages/Calendar.jsx) ---- */
+.month-week-number {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-subtle);
+}
+.month-day-empty .month-week-number {
+  margin-left: 0;
+}
+
+/* ---- Scheduling choices (pages/Platforms.jsx) ---- */
+.rule-change-choice {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+}
+.rule-change-choice label {
+  display: block;
+  margin: 6px 0;
+}
+.resume-choices {
+  color: var(--color-text);
+}
+.resume-choice-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.resume-choice-list li {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.resume-choice-list li p {
+  margin: 0 0 4px;
 }

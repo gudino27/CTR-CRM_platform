@@ -1,7 +1,26 @@
+/**
+ * The warning bar at the top of every page while the server runs in test mode:
+ * always visible while events go to the test calendar.
+ */
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
-// Deliverable 4: always visible while events go to the test calendar
+/**
+ * Says that scheduling is simulated, plus any calendar problem the server reports.
+ *
+ * Usage:
+ *   Rendered by Layout.jsx: <TestModeBanner />
+ *
+ * Returns:
+ *   Nothing unless GET /api/status says testMode. Otherwise the banner, with extra sentences
+ *   when dryRun is on, when Google Calendar is not connected, and with the last sync error.
+ *
+ * How it works:
+ *   Reads /api/status once per mount (each time Layout mounts, e.g. after signing in).
+ *
+ * When editing:
+ *   Test mode is TEST_MODE in .env (DRY_RUN for the dry run); see the README.
+ */
 export default function TestModeBanner() {
   const [status, setStatus] = useState(null);
 

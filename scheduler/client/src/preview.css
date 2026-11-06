@@ -1,0 +1,213 @@
+/* Live post preview (components/PostPreview.jsx). Colors come from the palette in styles.css. */
+
+/* Compose: the submit button with "Preview post" beside it */
+.compose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.compose-actions > button {
+  margin-top: 0;
+}
+
+/* The preview opens in a dialog (PreviewButton) */
+.preview-dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  background: var(--color-surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.preview-dialog::backdrop {
+  background: rgba(25, 42, 61, 0.55);
+}
+.preview-dialog-body {
+  padding: 20px;
+  overflow: auto;
+}
+.preview-device {
+  margin-bottom: 12px;
+}
+.preview-close {
+  /* outlined, like other secondary actions */
+  display: block;
+  margin: 16px 0 0 auto;
+}
+
+.post-preview {
+  position: sticky;
+  top: 16px;
+}
+@media (max-width: 900px) {
+  .compose-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compose-layout > .post-preview {
+    position: static;
+    max-width: 420px;
+  }
+}
+
+.post-preview {
+  min-width: 0;
+}
+/* In the Library edit form the button sits between the fields */
+.edit-form .preview-button {
+  margin: 12px 0 4px;
+}
+.preview-label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+.preview-label span {
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-button);
+}
+.preview-card {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+}
+.preview-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.preview-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-divider);
+  border-radius: 50%;
+}
+.preview-account div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.preview-account strong {
+  font-size: 14px;
+  color: var(--color-text);
+}
+.preview-account span {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+.preview-caption {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--color-text);
+  white-space: pre-wrap; /* keep the caption's line breaks */
+  overflow-wrap: anywhere;
+}
+.preview-empty {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+.preview-hashtag {
+  color: var(--color-link);
+  font-weight: 600;
+}
+.preview-more {
+  margin-left: 4px;
+  color: var(--color-text-subtle);
+  font-weight: 600;
+}
+.preview-image {
+  background: var(--color-surface-alt);
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+.preview-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Too tall or too wide for the feed: the frame takes the limit's shape (set inline) and
+   the image is center-cropped to fill it */
+.preview-image-cropped img {
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.preview-no-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  height: 100%;
+  font-size: 13px;
+  color: var(--color-text-faint);
+}
+.preview-alt {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-subtle);
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-divider);
+}
+.preview-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--color-text-subtle);
+}
+
+/* Instagram: "Feed" and "Profile grid" view labels */
+.preview-view-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.preview-grid-view {
+  margin-top: 14px;
+}
+/* Instagram's profile grid: 3 columns, 3:4 tiles (set by --tile-ratio), thin gaps, square corners */
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
+.preview-grid-tile {
+  aspect-ratio: var(--tile-ratio, 3 / 4);
+  overflow: hidden;
+  background: var(--color-surface-alt);
+}
+.preview-grid-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.preview-grid-placeholder {
+  background: var(--color-divider);
+}
+.preview-grid-tile .preview-no-image {
+  min-height: 0;
+  font-size: 12px;
+}

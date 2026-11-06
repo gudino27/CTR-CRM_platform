@@ -1,0 +1,123 @@
+/* Notification area: the header bell and the Notifications page. Palette from styles.css. */
+.notification-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--color-heading);
+}
+.notification-bell:hover,
+.notification-bell:focus-visible {
+  background: var(--color-secondary-hover);
+}
+.notification-bell:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+}
+.notification-count {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.notification-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notification-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  padding: 12px 16px;
+}
+.notification-item.unread {
+  border-left: 4px solid var(--color-primary);
+}
+.notification-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.notification-new {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.notification-when {
+  color: var(--color-text-subtle);
+  margin-left: auto;
+}
+.notification-title {
+  font-size: 16px;
+  margin: 6px 0 4px;
+  color: var(--color-heading);
+}
+.notification-body {
+  margin: 0;
+}
+.notification-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+.notification-links a {
+  color: var(--color-link);
+}
+.notification-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+.notification-compare > .post-actions,
+.notification-compare > .field-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.notification-side {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 0;
+}
+.notification-side h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+  color: var(--color-text-secondary);
+}
+.notification-side-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.notification-side pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 14px;
+}
+@media (max-width: 640px) {
+  .notification-compare {
+    grid-template-columns: 1fr;
+  }
+}

@@ -8,11 +8,16 @@
     "dev": "node --watch --env-file-if-exists=../.env src/index.js",
     "start": "node --env-file-if-exists=../.env src/index.js",
     "seed": "node --env-file-if-exists=../.env src/db/seed.js",
-    "test": "node --test"
+    "db:copy-sqlite-to-mariadb": "node --env-file-if-exists=../.env src/db/copySqliteToMariadb.js",
+    "test": "TIMEZONE=America/Los_Angeles node --test",
+    "test:mariadb": "TIMEZONE=America/Los_Angeles DB_CLIENT=mariadb DATABASE_URL=${TEST_DATABASE_URL:-mariadb://root:test@127.0.0.1:3307/ctr_test} node --test"
   },
   "dependencies": {
     "@googleapis/calendar": "^20.0.0",
     "@googleapis/drive": "^26.0.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mariadb": "^3.5.4",
+    "rrule": "^2.8.1",
+    "sharp": "^0.35.5"
   }
 }

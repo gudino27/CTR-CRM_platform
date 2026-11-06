@@ -64,7 +64,7 @@ CREATE TABLE dispatch (
   createdAt   TEXT NOT NULL
 );
 
--- What the built-in test endpoint received, so the team and client can inspect payloads
+-- What the built-in test endpoint received, so people can inspect payloads
 CREATE TABLE testWebhookReceipt (
   id          INTEGER PRIMARY KEY,
   payload     TEXT NOT NULL,

@@ -1,21 +1,69 @@
+/**
+ * Compose page: write a new post and either add it to a platform's Library (it fills the
+ * next matching empty slot) or schedule it on a Specific Date.
+ *
+ * What lives here:
+ *   Composer  the page (route /compose)
+ */
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { api } from "../api.js";
-import { formatDateTime, formatLocal } from "../time.js";
-import { ColorRadios, ConflictNotice, PostTypeSelect, splitFixedAt } from "../components/PostFields.jsx";
-import MediaPicker, { thumbnailUrl } from "../components/MediaPicker.jsx";
+import { formatDateTime, formatLocal, formatSlotTime, zoneCity } from "../time.js";
+import { YourTimeHint } from "../components/TimeZone.jsx"; // viewer's own time
+import { ColorRadios, ConflictNotice, PostTypeSelect, RequiredMark, splitFixedAt } from "../components/PostFields.jsx";
+import ImageField, { imageOfMedia, imageProblem } from "../components/ImageField.jsx";
+import { PreviewButton } from "../components/PostPreview.jsx";
+import { saveDraft, sessionState, takeDraft, useCurrentUser } from "../currentUser.js";
+import { BlackoutNotice } from "../components/BlackoutDates.jsx"; // blackout warning
+import { SuggestedColorNote, useSuggestedColor } from "../components/SuggestedColor.jsx"; // color suggestion
 
+/**
+ * The Compose form: mode (Specific Date / Add to Library), platform, post type (with
+ * "+ New post type"), color (Instagram/Facebook only), caption with a character count,
+ * image with alt text, and for Specific Date a date, a time in the app zone, the
+ * 2-hour collision notice and the blackout warning. "Preview post" opens the live preview.
+ *
+ * Usage:
+ *   Rendered by App.jsx for the /compose route: <Composer />. The Media page's
+ *   "Use in a new post" links to /compose?mediaId=ID to start with that image.
+ *
+ * Returns:
+ *   The page section; without createPosts only a short "Your role cannot create posts".
+ *
+ * How it works:
+ *   1. Loads the enabled platforms and the app time zone.
+ *   2. Draft kept across a session timeout: the form's values are mirrored in a ref; when
+ *      the page unmounts because the session ended and there is a caption or an image,
+ *      they are saved (sessionStorage, this tab only). On mount, a saved draft from the
+ *      same user is put back with a notice.
+ *   3. ?mediaId= loads that media row (GET /api/media/:id) into the image field.
+ *   4. The caption count is the trimmed caption alone, since hashtags are typed into the
+ *      caption. At the platform's charLimit it turns red; over it, Submit is disabled.
+ *   5. Picking a platform resets the post type to its first rotation type and, if no time
+ *      was chosen, sets the time to its earliest posting time.
+ *   6. Post types outside the rotation (Holiday) are Specific Date only: picking one in
+ *      Library mode switches to Specific Date, and switching to Library picks a rotation
+ *      type instead.
+ *   7. Submit (see submit() below) validates, posts, shows where it landed and clears the
+ *      form (platform, caption, image, alt text, date; mode, type, color and time stay).
+ *   8. Specific Date on a platform with colors: once a date and time are chosen, the color
+ *      that keeps Blue/Purple alternating is preselected (useSuggestedColor); the
+ *      user can still pick the other one. The post's color shifts the later slots.
+ *
+ * When editing:
+ *   POST /api/posts (server/src/routes/posts.js) checks everything again, including the
+ *   collision window and the image rules; the checks here are only for quick feedback.
+ *   Times are entered and sent in the app zone (TIMEZONE in .env), never the browser's.
+ */
 export default function Composer() {
+  const { user, permissions } = useCurrentUser();
+  const [searchParams] = useSearchParams();
   const [platforms, setPlatforms] = useState([]);
   const [timezone, setTimezone] = useState();
   const [platformId, setPlatformId] = useState("");
   const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const [image, setImage] = useState(null); // { file, previewUrl, media, uploading, error }
+  const [image, setImage] = useState(null); // { name, previewUrl, media, uploading, error }
   const [altText, setAltText] = useState("");
-  const [dragging, setDragging] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
-  const [imageWarnings, setImageWarnings] = useState([]);
-  // "library" fills the next matching empty slot; "fixed" is a Specific Date
   const [mode, setMode] = useState("library");
   const [postTypeId, setPostTypeId] = useState(null);
   const [color, setColor] = useState("Blue");
@@ -24,7 +72,30 @@ export default function Composer() {
   const [conflict, setConflict] = useState(null); // 409 body: { error, conflict, suggestedAt }
   const [message, setMessage] = useState("");
   const [newType, setNewType] = useState(null); // name being typed for a new post type, or null when closed
-  const fileInput = useRef(null);
+  const mediaIdParam = searchParams.get("mediaId");
+
+  // Draft kept across a session timeout (step 2 above)
+  const draft = useRef(null);
+  draft.current = { userId: user?.id, platformId, caption, media: image?.media ?? null, altText, mode, postTypeId, color, fixedDate, fixedTime };
+  useEffect(() => {
+    const saved = takeDraft("compose");
+    if (saved && saved.userId === user?.id) {
+      setPlatformId(saved.platformId ?? "");
+      setCaption(saved.caption ?? "");
+      setImage(saved.media ? imageOfMedia(saved.media) : null);
+      setAltText(saved.altText ?? "");
+      setMode(saved.mode ?? "library");
+      setPostTypeId(saved.postTypeId ?? null);
+      setColor(saved.color ?? "Blue");
+      setFixedDate(saved.fixedDate ?? "");
+      setFixedTime(saved.fixedTime ?? "");
+      setMessage("Your unsaved post was kept while you were signed out. Check it and send it when ready.");
+    }
+    return () => {
+      const { caption: text, media } = draft.current;
+      if (sessionState.ended && (text.trim() || media)) saveDraft("compose", draft.current);
+    };
+  }, []);
 
   useEffect(() => {
     api.platforms()
@@ -33,41 +104,58 @@ export default function Composer() {
     api.status().then((status) => setTimezone(status.timezone)).catch(() => {});
   }, []);
 
-  // Free the preview's object URL when the image changes or the page closes
-  // (only local files have one; library images use their server link)
-  useEffect(() => () => {
-    if (image?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(image.previewUrl);
-  }, [image?.previewUrl]);
-
-  // Warn when the image breaks the chosen platform's format, size or shape rules
+  // ?mediaId=ID from the Media page's "Use in a new post"
   useEffect(() => {
-    if (!image?.media || !platformId) return setImageWarnings([]);
+    if (!mediaIdParam) return;
     let current = true;
-    fetch(`/api/media/${image.media.id}/check?platformId=${platformId}`)
-      .then((res) => (res.ok ? res.json() : { warnings: [] }))
-      .then((result) => current && setImageWarnings(result.warnings ?? []))
-      .catch(() => current && setImageWarnings([]));
+    fetch(`/api/media/${encodeURIComponent(mediaIdParam)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
+        return res.json();
+      })
+      .then((media) => current && setImage(imageOfMedia(media)))
+      .catch((error) => current && setMessage(`Could not load that image: ${error.message}`));
     return () => { current = false; };
-  }, [image?.media?.id, platformId]);
+  }, [mediaIdParam]);
 
   const platform = platforms.find((p) => p.id === Number(platformId));
-  const postLength = caption.trim().length + (hashtags.trim() ? hashtags.trim().length + 2 : 0);
+  // Hashtags are part of the caption
+  const postLength = caption.trim().length;
   const atLimit = Boolean(platform?.charLimit && postLength >= platform.charLimit);
   const overLimit = Boolean(platform?.charLimit && postLength > platform.charLimit);
-  const postingTime = platform ? [...platform.postingTimes].sort()[0] : null;
+  const postingTime = platform ? [...(platform.postingTimes ?? [])].sort()[0] : null;
   const postTypeName = platform?.postTypes?.find((type) => type.id === postTypeId)?.name;
+  const colorSuggestion = useSuggestedColor({ platform, date: fixedDate, time: fixedTime, enabled: mode === "fixed", onSuggest: setColor });
 
-  // A new platform has its own post types and posting time
+  /**
+   * Switches platform. Each platform has its own post types and posting times, so the
+   * type resets to the platform's first rotation type, any collision notice is cleared,
+   * and the time is set to its earliest posting time unless one was already chosen.
+   *
+   * Takes:
+   *   id - the platform id from the select, as a string ("" for none)
+   */
   function choosePlatform(id) {
     setPlatformId(id);
     setConflict(null);
     const next = platforms.find((p) => p.id === Number(id));
     setPostTypeId(next?.postTypes?.find((type) => type.inRotation)?.id ?? null);
-    if (next && !fixedTime) setFixedTime([...next.postingTimes].sort()[0] ?? "");
+    if (next && !fixedTime) setFixedTime([...(next.postingTimes ?? [])].sort()[0] ?? "");
   }
 
-  // Adds a post type to this platform without leaving Compose. In Library mode it joins the
-  // monthly rotation (so slots will ask for it); in Specific Date mode it stays out of it, like Holiday.
+  /**
+   * Adds a post type to this platform without leaving Compose (needs managePostTypes).
+   *
+   * Usage:
+   *   The "Add" button or Enter in the "New post type" field.
+   *
+   * How it works:
+   *   1. Does nothing without a name or a platform.
+   *   2. In Library mode the type joins the monthly rotation (so slots will ask for it);
+   *      in Specific Date mode it stays out of it, like Holiday.
+   *   3. The server returns the whole platform; it replaces the old copy, and the new
+   *      type (matched by name, any case) is selected.
+   */
   async function addPostType() {
     const name = newType?.trim();
     if (!name || !platform) return;
@@ -82,70 +170,68 @@ export default function Composer() {
     }
   }
 
-  // A type outside the rotation (Holiday) can't wait in the library, so picking one switches to Specific Date
+  /**
+   * Selects a post type. A type outside the rotation (Holiday) can't wait in the library,
+   * so picking one in Library mode switches to Specific Date.
+   *
+   * Takes:
+   *   id - the post type id (number)
+   */
   function choosePostType(id) {
     setPostTypeId(id);
     const type = platform?.postTypes?.find((t) => t.id === id);
     if (type && !type.inRotation && mode === "library") setMode("fixed");
   }
 
-  // Holiday-style types are only for Specific Date posts; switching to Library picks a rotation type
+  // Switching to Library with a non-rotation type picks a rotation type
   useEffect(() => {
     if (mode !== "library" || !platform) return;
     const current = platform.postTypes?.find((type) => type.id === postTypeId);
     if (!current?.inRotation) setPostTypeId(platform.postTypes?.find((type) => type.inRotation)?.id ?? null);
   }, [mode, platform, postTypeId]);
 
-  // Uploads as soon as an image is chosen, so submit only has to send the media id
-  async function chooseImage(file) {
-    if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
-    setImage({ file, previewUrl, media: null, uploading: true, error: "" });
-
-    try {
-      const media = await api.uploadMedia(file);
-      setImage((current) => current?.previewUrl === previewUrl ? { ...current, media, uploading: false } : current);
-    } catch (error) {
-      setImage((current) => current?.previewUrl === previewUrl ? { ...current, uploading: false, error: error.message } : current);
-    }
-  }
-
-  function chooseFromLibrary(media) {
-    setImage({ file: { name: media.name }, previewUrl: thumbnailUrl(media), media, uploading: false, error: "" });
-    setShowLibrary(false);
-  }
-
-  function removeImage() {
-    setImage(null);
-    setAltText("");
-    if (fileInput.current) fileInput.current.value = "";
-  }
-
-  function handleDrop(event) {
-    event.preventDefault();
-    setDragging(false);
-    chooseImage(event.dataTransfer.files?.[0]);
-  }
-
   async function handleSubmit(event) {
     event.preventDefault();
     await submit(false);
   }
 
+  /**
+   * Validates and sends the post.
+   *
+   * Usage:
+   *   submit(false)  // the form's Submit button
+   *   submit(true)   // "Schedule anyway" in the collision notice
+   *
+   * Takes:
+   *   force - true to schedule even when another Specific Date post is within the
+   *           collision window
+   *
+   * Returns:
+   *   Nothing; shows a message either way.
+   *
+   * How it works:
+   *   1. Checks in order: platform and caption, the image (imageProblem in
+   *      ImageField.jsx), post type, and for Specific Date the date and time.
+   *   2. Sends { platformId, caption, mediaId, altText, kind, postTypeId, color, fixedAt? }.
+   *      color is null on platforms without colors. fixedAt is "YYYY-MM-DDTHH:MM" in the
+   *      app zone.
+   *   3. A 409 with a conflict body shows the collision notice (with the suggested time);
+   *      other errors show their message.
+   *   4. On success says where it landed: the Specific Date time (that day's library post
+   *      went back to the library), or the slot it fills, or that it waits for the next
+   *      empty slot of its type and color. Then clears the form.
+   */
   async function submit(force) {
     if (!platform || !caption.trim()) {
       setMessage("Please select a platform and enter a caption.");
       return;
     }
-    if (image?.uploading) {
-      setMessage("Please wait for the image to finish uploading.");
+    const missingImage = imageProblem(image);
+    if (missingImage) {
+      setMessage(missingImage);
       return;
     }
-    if (image && !image.media) {
-      setMessage("The image did not upload. Remove it or choose another.");
-      return;
-    }
-    if (mode === "library" && !postTypeId) {
+    if (!postTypeId) {
       setMessage("Please choose a post type.");
       return;
     }
@@ -163,8 +249,7 @@ export default function Composer() {
       post = await api.createPost({
         platformId: platform.id,
         caption,
-        hashtags,
-        mediaId: image?.media.id ?? null,
+        mediaId: image.media.id,
         altText,
         ...schedule,
         ...(force ? { force: true } : {}),
@@ -180,7 +265,7 @@ export default function Composer() {
     }
 
     if (post.kind === "fixed") {
-      setMessage(`Scheduled on ${platform.name} for ${formatLocal(post.fixedAt)}. That day's library post went back to the library.`);
+      setMessage(`Scheduled on ${platform.name} for ${formatLocal(post.fixedAt, timezone)}. That day's library post went back to the library.`);
     } else {
       const slotLabel = `${post.postTypeName ?? postTypeName}${post.color ? ` · ${post.color}` : ""}`;
       setMessage(
@@ -193,11 +278,17 @@ export default function Composer() {
     setConflict(null);
     setPlatformId("");
     setCaption("");
-    setHashtags("");
-    removeImage();
+    setImage(null);
+    setAltText("");
     setFixedDate("");
   }
 
+  /**
+   * Puts the collision notice's suggested time into the date and time fields.
+   *
+   * Takes:
+   *   suggestedAt - "YYYY-MM-DDTHH:MM" in the app zone, from the 409 body
+   */
   function applySuggested(suggestedAt) {
     const { date, time } = splitFixedAt(suggestedAt);
     setFixedDate(date);
@@ -205,38 +296,54 @@ export default function Composer() {
     setConflict(null);
   }
 
+  if (!permissions.createPosts) {
+    return (
+      <section>
+        <h1>Compose</h1>
+        <p>Your role cannot create posts. Ask a super admin if you need to.</p>
+      </section>
+    );
+  }
+
   return (
     <section>
       <h1>Compose</h1>
 
       <form onSubmit={handleSubmit}>
-        <div className="mode-toggle" role="group" aria-label="When to post">
-          <button
-            type="button"
-            className={mode === "fixed" ? "active-view" : ""}
-            aria-pressed={mode === "fixed"}
-            onClick={() => { setMode("fixed"); setConflict(null); }}
-          >
-            Specific Date
-          </button>
-          <button
-            type="button"
-            className={mode === "library" ? "active-view" : ""}
-            aria-pressed={mode === "library"}
-            onClick={() => { setMode("library"); setConflict(null); }}
-          >
-            Add to Library
-          </button>
+        <div>
+          <span className="field-label" id="whenLabel">When to post</span>
+          <div className="mode-toggle" role="group" aria-labelledby="whenLabel">
+            <button
+              type="button"
+              className={mode === "fixed" ? "active-view" : ""}
+              aria-pressed={mode === "fixed"}
+              onClick={() => { setMode("fixed"); setConflict(null); }}
+            >
+              Specific Date
+            </button>
+            <button
+              type="button"
+              className={mode === "library" ? "active-view" : ""}
+              aria-pressed={mode === "library"}
+              onClick={() => { setMode("library"); setConflict(null); }}
+            >
+              Add to Library
+            </button>
+          </div>
+          <p className="field-hint required-legend">
+            Fields marked <span className="required-star" aria-hidden="true">*</span> are required.
+          </p>
         </div>
 
         <div>
-          <label htmlFor="platform">Platform</label>
+          <label htmlFor="platform">Platform <RequiredMark /></label>
 
           <select
             id="platform"
             value={platformId}
             onChange={(event) => choosePlatform(event.target.value)}
             required
+            aria-required="true"
           >
             <option value="">Select a platform</option>
             {platforms.map((p) => (
@@ -248,126 +355,15 @@ export default function Composer() {
         </div>
 
         <div>
-          <label htmlFor="caption">Caption</label>
-
-          <textarea
-            id="caption"
-            value={caption}
-            onChange={(event) => setCaption(event.target.value)}
-            placeholder="Write your post caption here..."
-            rows="6"
-            required
-          />
-
-          <p className={atLimit ? "error-text" : undefined}>
-            Characters (with hashtags): {postLength}
-            {platform?.charLimit ? ` / ${platform.charLimit}` : ""}
-            {overLimit ? ` (${postLength - platform.charLimit} over ${platform.name}'s limit)` : ""}
-            {atLimit && !overLimit ? " (at the limit)" : ""}
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="hashtags">Hashtags</label>
-
-          <input
-            id="hashtags"
-            type="text"
-            value={hashtags}
-            onChange={(event) => setHashtags(event.target.value)}
-            placeholder="#volunteer #community"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="image">Image</label>
-
-          <div
-            className={`drop-zone${dragging ? " drop-zone-active" : ""}`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInput.current?.click()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") fileInput.current?.click();
-            }}
-          >
-            {image ? (
-              <img className="drop-zone-preview" src={image.previewUrl} alt={altText || image.file.name} />
-            ) : (
-              <p>Drag an image here, or click to choose one (JPEG, PNG or WebP)</p>
-            )}
-          </div>
-
-          <input
-            id="image"
-            ref={fileInput}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            hidden
-            onChange={(event) => chooseImage(event.target.files?.[0])}
-          />
-
-          {image && (
-            <p>
-              {image.uploading && `Uploading ${image.file.name}...`}
-              {image.media && `Uploaded ${image.file.name}.`}
-              {image.error && <span className="error-text">{image.error}</span>}{" "}
-              <button type="button" onClick={removeImage}>
-                Remove image
-              </button>
-            </p>
-          )}
-
-          {imageWarnings.length > 0 && (
-            <ul className="error-text">
-              {imageWarnings.map((warning) => <li key={warning}>{warning}</li>)}
-            </ul>
-          )}
-
-          <button type="button" onClick={() => setShowLibrary((open) => !open)}>
-            {showLibrary ? "Hide media library" : "Choose from media library"}
-          </button>
-
-          {showLibrary && <MediaPicker onSelect={chooseFromLibrary} selectedId={image?.media?.id ?? null} />}
-        </div>
-
-        {image && (
-          <div>
-            <label htmlFor="altText">Alt Text</label>
-
-            <input
-              id="altText"
-              type="text"
-              value={altText}
-              onChange={(event) => setAltText(event.target.value)}
-              placeholder="Describe the image for people using screen readers"
-            />
-          </div>
-        )}
-
-        {platform?.usesColors && (
-          <div>
-            <span className="field-label">Color</span>
-            <ColorRadios name="composeColor" value={color} onChange={setColor} />
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="postType">Post Type</label>
+          <label htmlFor="postType">Post Type <RequiredMark /></label>
           {platform ? (
             <PostTypeSelect id="postType" platform={platform} value={postTypeId} onChange={choosePostType} />
           ) : (
-            <select id="postType" disabled>
+            <select id="postType" disabled aria-required="true">
               <option>Select a platform first</option>
             </select>
           )}
-          {platform && (newType === null ? (
+          {platform && permissions.managePostTypes && (newType === null ? (
             <button type="button" className="link-button" onClick={() => setNewType("")}>
               + New post type
             </button>
@@ -385,7 +381,7 @@ export default function Composer() {
                 autoFocus
               />
               <button type="button" onClick={addPostType}>Add</button>
-              <button type="button" onClick={() => setNewType(null)}>Cancel</button>
+              <button type="button" className="secondary-button" onClick={() => setNewType(null)}>Cancel</button>
               <span className="field-hint">
                 {mode === "library" ? "Joins the monthly rotation." : "Specific Date only, like Holiday."} Manage types on the Platforms page.
               </span>
@@ -400,34 +396,81 @@ export default function Composer() {
           )}
         </div>
 
+        {platform?.usesColors && (
+          <div>
+            <span className="field-label" id="composeColorLabel">Color <RequiredMark /></span>
+            <ColorRadios name="composeColor" value={color} onChange={setColor} labelledBy="composeColorLabel" />
+            <p className="field-hint">The color of the post's graphic.</p>
+            {mode === "fixed" && <SuggestedColorNote suggestion={colorSuggestion} color={color} />}
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="caption">Caption <RequiredMark /></label>
+
+          <textarea
+            id="caption"
+            value={caption}
+            onChange={(event) => setCaption(event.target.value)}
+            placeholder="Write your post caption here, hashtags included..."
+            rows="6"
+            required
+            aria-required="true"
+            aria-describedby="captionCount"
+          />
+
+          <p id="captionCount" className={atLimit ? "error-text" : "field-hint"}>
+            Characters: {postLength}
+            {platform?.charLimit ? ` / ${platform.charLimit}` : ""}
+            {overLimit ? ` (${postLength - platform.charLimit} over ${platform.name}'s limit)` : ""}
+            {atLimit && !overLimit ? " (at the limit)" : ""}
+          </p>
+        </div>
+
+        <div>
+          <ImageField
+            idPrefix="compose"
+            image={image}
+            setImage={setImage}
+            altText={altText}
+            setAltText={setAltText}
+            platformId={platformId}
+            removable
+          />
+        </div>
+
         {mode === "fixed" && (
           <div>
             <div className="date-time-row">
               <div>
-                <label htmlFor="fixedDate">Date</label>
+                <label htmlFor="fixedDate">Date <RequiredMark /></label>
                 <input
                   id="fixedDate"
                   type="date"
                   value={fixedDate}
                   onChange={(event) => { setFixedDate(event.target.value); setConflict(null); }}
                   required
+                  aria-required="true"
                 />
               </div>
               <div>
-                <label htmlFor="fixedTime">Time</label>
+                <label htmlFor="fixedTime">Time ({zoneCity(timezone)}) <RequiredMark /></label>
                 <input
                   id="fixedTime"
                   type="time"
                   value={fixedTime}
                   onChange={(event) => { setFixedTime(event.target.value); setConflict(null); }}
                   required
+                  aria-required="true"
                 />
               </div>
             </div>
+            <YourTimeHint date={fixedDate} time={fixedTime} timeZone={timezone} />
             <p className="field-hint">
               Fixed: automation never moves it. That day's library post goes back to the library.
-              {postingTime && ` ${platform.name} usually posts at ${postingTime}.`}
+              {postingTime && ` ${platform.name} usually posts at ${formatSlotTime(fixedDate, postingTime, timezone)}.`}
             </p>
+            <BlackoutNotice platformId={platform?.id} date={fixedDate} />
 
             {conflict && (
               <ConflictNotice conflict={conflict} onUseSuggested={applySuggested} onForce={() => submit(true)} />
@@ -435,11 +478,15 @@ export default function Composer() {
           </div>
         )}
 
-        <button type="submit" disabled={overLimit || image?.uploading}>
-          {mode === "fixed" ? "Schedule on this Date" : "Add to Library"}
-        </button>
+        <div className="compose-actions">
+          <button type="submit" disabled={overLimit || image?.uploading}>
+            {mode === "fixed" ? "Schedule on this Date" : "Add to Library"}
+          </button>
+          {/* How it will look on the chosen platform, in a dialog */}
+          <PreviewButton platform={platform} caption={caption} image={image} altText={altText} />
+        </div>
 
-        {message && <p>{message}</p>}
+        {message && <p role="status">{message}</p>}
       </form>
     </section>
   );

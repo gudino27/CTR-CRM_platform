@@ -10,7 +10,9 @@
     "build": "npm run build --workspace client",
     "start": "npm start --workspace server",
     "test": "npm test --workspace server",
+    "test:mariadb": "npm run test:mariadb --workspace server",
     "db:seed": "npm run seed --workspace server",
+    "db:copy-sqlite-to-mariadb": "npm run db:copy-sqlite-to-mariadb --workspace server --",
     "share": "node scripts/share.mjs",
     "google:token": "node --env-file=.env scripts/googleToken.mjs"
   }

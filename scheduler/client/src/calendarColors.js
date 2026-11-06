@@ -1,4 +1,21 @@
-// Google Calendar event colors, keyed by the colorId the API stores
+/**
+ * Google Calendar's event colors, so the Platforms page can show and pick the color each
+ * platform's calendar events get. What lives here: calendarColors (the list).
+ */
+
+/**
+ * Google Calendar's event colors, keyed by the colorId the API stores (platform.calendarColorId).
+ *
+ * Usage:
+ *   Object.entries(calendarColors).map(([id, color]) => ...)   (pages/Platforms.jsx)
+ *
+ * Returns:
+ *   { [colorId]: { name, hex } } for ids 1 to 11.
+ *
+ * When editing:
+ *   This is Google's own list: the ids are what Google Calendar accepts as an event colorId,
+ *   and the names and shades match what Google shows. Do not add or renumber entries.
+ */
 export const calendarColors = {
   1: { name: 'Lavender', hex: '#7986cb' },
   2: { name: 'Sage', hex: '#33b679' },
@@ -12,5 +29,3 @@ export const calendarColors = {
   10: { name: 'Basil', hex: '#0b8043' },
   11: { name: 'Tomato', hex: '#d50000' },
 };
-
-export const platformColor = (platform) => calendarColors[platform?.calendarColorId]?.hex ?? '#94a3b8';

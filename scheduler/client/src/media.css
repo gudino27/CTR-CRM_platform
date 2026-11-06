@@ -197,3 +197,101 @@
     gap: 8px;
   }
 }
+
+/* Media page actions: "Use in a new post", Delete and its in-page confirm */
+.media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0;
+}
+
+/* A link that looks like the app's primary button (pill shape, as in the branding) */
+.media-action-link {
+  display: inline-block;
+  margin: 4px 6px 4px 0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.media-action-link:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-on-primary);
+}
+
+.media-action-link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.media-confirm,
+.media-delete-error {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+}
+
+.media-confirm p,
+.media-delete-error p {
+  margin: 0 0 8px;
+}
+
+/* Media page views: Library, Recently deleted, Kept for history */
+.media-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+/* Tabs look like pills: outlined, filled when chosen */
+.media-views .media-view {
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.media-views .media-view:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.media-views .media-view-active,
+.media-views .media-view-active:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.media-view-hint {
+  margin: 0 0 12px;
+  color: var(--color-text-subtle);
+}
+
+.media-notice,
+.image-notice {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+/* ImageField rotate buttons under the preview */
+.image-rotate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.image-rotate-hint {
+  flex-basis: 100%;
+  color: var(--color-text-subtle);
+  font-size: 13px;
+}

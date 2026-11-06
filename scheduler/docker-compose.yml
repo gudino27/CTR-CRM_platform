@@ -4,6 +4,8 @@ services:
     image: ghcr.io/gudino27/ctr-social-scheduler:latest
     env_file: .env
     environment:
+      # Used when DB_CLIENT=sqlite (the default). With DB_CLIENT=mariadb the app uses
+      # DATABASE_URL (or DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME) from .env instead.
       DB_PATH: /data/scheduler.db
       # Inside the container the app always uses 3000; PORT in .env only picks the host port
       PORT: "3000"
@@ -12,8 +14,37 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     volumes:
+      # SQLite file, and uploaded images when Drive isn't configured (on MariaDB too)
       - scheduler-data:/data
+    depends_on:
+      # Only when the local MariaDB below is started (--profile mariadb)
+      mariadb:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # Optional local MariaDB for trying the app on MariaDB before pointing it at the server:
+  #   docker compose --profile mariadb up -d
+  # with DB_CLIENT=mariadb, DB_HOST=mariadb, DB_USER, DB_PASSWORD and DB_NAME set in .env.
+  # Production uses its own MariaDB server: set DATABASE_URL instead and leave this profile off.
+  mariadb:
+    image: mariadb:11.4
+    profiles: ["mariadb"]
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-scheduler}
+      MARIADB_USER: ${DB_USER:-scheduler}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_nopad_bin"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     restart: unless-stopped
 
 volumes:
   scheduler-data:
+  mariadb-data:
