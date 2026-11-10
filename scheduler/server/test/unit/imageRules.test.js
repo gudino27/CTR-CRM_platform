@@ -2,10 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  checkImage,
-  imageRules,
-} from '../../src/services/imageRules.js';
+
+import { checkImage } from '../../src/services/imageRules.js';
+import { imageRules } from '../../src/settings.js';
+
 
 const MB = 1024 * 1024;
 

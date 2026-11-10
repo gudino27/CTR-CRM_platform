@@ -6,9 +6,9 @@ import express from 'express';
 import { openDb } from '../../src/db/index.js';
 import { postsRouter } from '../../src/routes/posts.js';
 
-// Create an isolated test API and in-memory database.
+// Create an isolated API and in-memory SQLite database.
 async function withTestApi(callback) {
-  const db = openDb(':memory:');
+  const db = await openDb(':memory:');
   const app = express();
 
   app.use(express.json());
@@ -27,6 +27,7 @@ async function withTestApi(callback) {
       `http://127.0.0.1:${server.address().port}/api/posts`;
 
     await callback(baseUrl);
+
   } finally {
     if (server) {
       await new Promise((resolve, reject) => {
@@ -35,7 +36,8 @@ async function withTestApi(callback) {
         );
       });
     }
-    db.close();
+
+    await db.close();
   }
 }
 
@@ -50,7 +52,7 @@ test('TC-074: Retrieve posts from empty database', async () => {
   });
 });
 
-// TC-075: Reject invalid filters
+// TC-075: Reject invalid post filters
 test('TC-075: Reject invalid post filters', async () => {
   await withTestApi(async (url) => {
     const invalidFilters = [
@@ -61,6 +63,7 @@ test('TC-075: Reject invalid post filters', async () => {
 
     for (const filter of invalidFilters) {
       const response = await fetch(url + filter);
+
       assert.equal(response.status, 400);
     }
   });
@@ -86,7 +89,7 @@ test('TC-076: Reject post with invalid platform', async () => {
   });
 });
 
-// TC-077: Reject editing nonexistent posts
+// TC-077: Reject editing nonexistent post
 test('TC-077: Reject editing nonexistent post', async () => {
   await withTestApi(async (url) => {
     const response = await fetch(`${url}/999999`, {
@@ -101,7 +104,7 @@ test('TC-077: Reject editing nonexistent post', async () => {
   });
 });
 
-// TC-078: Reject requeuing nonexistent posts
+// TC-078: Reject requeue of nonexistent post
 test('TC-078: Reject requeue of nonexistent post', async () => {
   await withTestApi(async (url) => {
     const response = await fetch(
@@ -113,7 +116,7 @@ test('TC-078: Reject requeue of nonexistent post', async () => {
   });
 });
 
-// TC-079: Reject status updates for unknown posts
+// TC-079: Reject status update for missing post
 test('TC-079: Reject status update for missing post', async () => {
   await withTestApi(async (url) => {
     const response = await fetch(
@@ -121,7 +124,9 @@ test('TC-079: Reject status update for missing post', async () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'posted' }),
+        body: JSON.stringify({
+          status: 'posted',
+        }),
       }
     );
 
@@ -129,7 +134,7 @@ test('TC-079: Reject status update for missing post', async () => {
   });
 });
 
-// TC-080: Reject deleting nonexistent posts
+// TC-080: Reject deleting nonexistent post
 test('TC-080: Reject deleting nonexistent post', async () => {
   await withTestApi(async (url) => {
     const response = await fetch(`${url}/999999`, {

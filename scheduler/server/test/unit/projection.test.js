@@ -12,11 +12,10 @@ import {
   fillSlots,
 } from '../../src/services/projection.js';
 
+// Test configuration
 const timeZone = 'America/New_York';
 
 const platform = {
-  postingDays: ['MON', 'FRI'],
-  postingTimes: ['13:00'],
   usesColors: true,
 };
 
@@ -25,9 +24,28 @@ const postTypes = [
   { id: 10, sortOrder: 1 },
 ];
 
+// New scheduling system uses schedule rules.
+const scheduleRules = [
+  {
+    id: 1,
+    byDay: 'MO,FR',
+    time: '13:00',
+    startDate: '2026-01-01',
+    endDate: null,
+    intervalWeeks: 1,
+    postTypeIds: [],
+    sortOrder: 0,
+    active: true,
+  },
+];
+
 // TC-011: Month validation
 test('TC-011: Validate month format', () => {
-  assert.deepEqual(parseMonth('2026-11'), [2026, 11]);
+  assert.deepEqual(
+    parseMonth('2026-11'),
+    [2026, 11]
+  );
+
   assert.equal(parseMonth('2026-13'), null);
   assert.equal(parseMonth('2026-00'), null);
   assert.equal(parseMonth('2026-1'), null);
@@ -58,35 +76,55 @@ test('TC-013: Calculate months between dates', () => {
 // TC-014: Generate slots on configured days
 test('TC-014: Generate correct posting days', () => {
   const slots = monthBlueprint(
-    platform, postTypes, 2026, 1, timeZone
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    1,
+    timeZone
   );
 
+  // January 2026 has 9 Mondays and Fridays.
   assert.equal(slots.length, 9);
+
   assert.equal(slots[0].date, '2026-01-02');
   assert.equal(slots[1].date, '2026-01-05');
   assert.equal(slots[8].date, '2026-01-30');
 
+  // 1 PM Eastern = 6 PM UTC in January.
   assert.equal(
     slots[0].scheduledAt,
     '2026-01-02T18:00:00.000Z'
   );
+
+  assert.equal(slots[0].time, '13:00');
+  assert.equal(slots[0].ruleId, 1);
 });
 
 // TC-015: Alternate colors and post types
 test('TC-015: Alternate colors and post types', () => {
   const slots = monthBlueprint(
-    platform, postTypes, 2026, 1, timeZone
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    1,
+    timeZone
   );
 
-  assert.deepEqual(COLORS, ['Blue', 'Purple']);
+  assert.deepEqual(
+    COLORS,
+    ['Blue', 'Purple']
+  );
 
   assert.deepEqual(
-    slots.slice(0, 3).map((slot) => slot.color),
+    slots.slice(0, 3).map(slot => slot.color),
     ['Blue', 'Purple', 'Blue']
   );
 
+  // Post types follow sortOrder.
   assert.deepEqual(
-    slots.slice(0, 3).map((slot) => slot.postTypeId),
+    slots.slice(0, 3).map(slot => slot.postTypeId),
     [10, 20, 10]
   );
 });
@@ -94,35 +132,98 @@ test('TC-015: Alternate colors and post types', () => {
 // TC-016: Continue rotation between months
 test('TC-016: Continue rotation across months', () => {
   const january = monthBlueprint(
-    platform, postTypes, 2026, 1, timeZone
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    1,
+    timeZone
   );
 
   const february = monthBlueprint(
-    platform, postTypes, 2026, 2, timeZone
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    2,
+    timeZone
   );
 
-  assert.equal(january.at(-1).color, 'Blue');
-  assert.equal(february[0].color, 'Purple');
+  // January ends with Blue.
+  assert.equal(
+    january.at(-1).color,
+    'Blue'
+  );
 
-  assert.equal(january.at(-1).postTypeId, 10);
-  assert.equal(february[0].postTypeId, 20);
+  // February continues with Purple.
+  assert.equal(
+    february[0].color,
+    'Purple'
+  );
+
+  // Post type rotation must continue as well.
+  assert.equal(
+    january.at(-1).postTypeId,
+    10
+  );
+
+  assert.equal(
+    february[0].postTypeId,
+    20
+  );
 });
 
-// TC-017: Sort posting times and support no colors
+// TC-017: Handle multiple posting times
 test('TC-017: Handle multiple posting times', () => {
   const noColorPlatform = {
-    postingDays: ['FRI'],
-    postingTimes: ['17:00', '09:00'],
     usesColors: false,
   };
 
+  const rules = [
+    {
+      id: 1,
+      byDay: 'FR',
+      time: '17:00',
+      startDate: '2026-01-01',
+      endDate: null,
+      intervalWeeks: 1,
+      postTypeIds: [],
+      sortOrder: 0,
+      active: true,
+    },
+    {
+      id: 2,
+      byDay: 'FR',
+      time: '09:00',
+      startDate: '2026-01-01',
+      endDate: null,
+      intervalWeeks: 1,
+      postTypeIds: [],
+      sortOrder: 1,
+      active: true,
+    },
+  ];
+
   const slots = monthBlueprint(
-    noColorPlatform, [], 2026, 1, timeZone
+    noColorPlatform,
+    rules,
+    [],
+    2026,
+    1,
+    timeZone
   );
 
+  // Five Fridays, two posting times each.
+  assert.equal(slots.length, 10);
+
+  // Times must appear in chronological order.
   assert.equal(slots[0].time, '09:00');
   assert.equal(slots[1].time, '17:00');
 
+  assert.equal(slots[0].date, '2026-01-02');
+  assert.equal(slots[1].date, '2026-01-02');
+
+  // Platform without color rotation.
   assert.equal(slots[0].color, null);
   assert.equal(slots[0].postTypeId, null);
 });
@@ -135,22 +236,40 @@ test('TC-018: Match posts to compatible slots', () => {
   };
 
   assert.equal(
-    fitsSlot(slot, { postTypeId: 1, color: 'Blue' }, true),
+    fitsSlot(
+      slot,
+      { postTypeId: 1, color: 'Blue' },
+      true
+    ),
     true
   );
 
   assert.equal(
-    fitsSlot(slot, { postTypeId: 1, color: 'Purple' }, true),
+    fitsSlot(
+      slot,
+      { postTypeId: 1, color: 'Purple' },
+      true
+    ),
     false
   );
 
   assert.equal(
-    fitsSlot(slot, { postTypeId: 2, color: 'Blue' }, true),
+    fitsSlot(
+      slot,
+      { postTypeId: 2, color: 'Blue' },
+      true
+    ),
     false
   );
 
+  // Color does not matter for platforms
+  // that do not use color rotation.
   assert.equal(
-    fitsSlot(slot, { postTypeId: 1, color: 'Purple' }, false),
+    fitsSlot(
+      slot,
+      { postTypeId: 1, color: 'Purple' },
+      false
+    ),
     true
   );
 });
@@ -199,11 +318,14 @@ test('TC-019: Assign posts in correct order', () => {
     },
   ];
 
-  assert.deepEqual(fillSlots(slots, posts, true), [
-    { slotId: 102, postId: 203 },
-    { slotId: 101, postId: 204 },
-    { slotId: 103, postId: 202 },
-  ]);
+  assert.deepEqual(
+    fillSlots(slots, posts, true),
+    [
+      { slotId: 102, postId: 203 },
+      { slotId: 101, postId: 204 },
+      { slotId: 103, postId: 202 },
+    ]
+  );
 });
 
 // TC-020: Skip slots without compatible posts
@@ -232,22 +354,12 @@ test('TC-020: Skip unmatched slots', () => {
     },
   ];
 
-  assert.deepEqual(fillSlots(slots, posts, false), [
-    { slotId: 1, postId: 55 },
-  ]);
+  // Colors are ignored when usesColors = false.
+  assert.deepEqual(
+    fillSlots(slots, posts, false),
+    [
+      { slotId: 1, postId: 55 },
+    ]
+  );
 });
 
-// Pending client requirements.
-// These are not yet executable tests.
-
-test.todo(
-  'TC-021: Holiday insertion shifts all later color rotations'
-);
-
-test.todo(
-  'TC-022: Posting day changes offer preserve or move options'
-);
-
-test.todo(
-  'TC-023: Slot post type changes support rotation choices'
-);

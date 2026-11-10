@@ -13,8 +13,8 @@ import { join } from 'node:path';
 
 import { openDb } from '../../src/db/index.js';
 
-// Create a separate temporary database location.
-function withTemporaryDatabase(callback) {
+// Create an isolated temporary SQLite database.
+async function withTemporaryDatabase(callback) {
   const directory = mkdtempSync(
     join(tmpdir(), 'ctr-db-test-')
   );
@@ -22,7 +22,7 @@ function withTemporaryDatabase(callback) {
   const dbPath = join(directory, 'test.sqlite');
 
   try {
-    callback(dbPath);
+    await callback(dbPath);
   } finally {
     rmSync(directory, {
       recursive: true,
@@ -31,27 +31,29 @@ function withTemporaryDatabase(callback) {
   }
 }
 
-// TC-069: Initialize database
-test('TC-069: Initialize SQLite database', () => {
-  const db = openDb(':memory:');
+// TC-069: Initialize SQLite database
+test('TC-069: Initialize SQLite database', async () => {
+  const db = await openDb(':memory:');
 
   try {
-    const result = db.prepare(`
+    const result = await db.get(`
       SELECT name
       FROM sqlite_master
       WHERE type = 'table'
       AND name = 'schemaMigration'
-    `).get();
+    `);
 
     assert.equal(result.name, 'schemaMigration');
+    assert.equal(db.dialect, 'sqlite');
+
   } finally {
-    db.close();
+    await db.close();
   }
 });
 
 // TC-070: Verify database migrations
-test('TC-070: Apply database migrations', () => {
-  const db = openDb(':memory:');
+test('TC-070: Apply database migrations', async () => {
+  const db = await openDb(':memory:');
 
   try {
     const expected = readdirSync(
@@ -60,32 +62,34 @@ test('TC-070: Apply database migrations', () => {
       .filter(name => name.endsWith('.sql'))
       .sort();
 
-    const actual = db.prepare(`
+    const rows = await db.all(`
       SELECT name
       FROM schemaMigration
       ORDER BY name
-    `).all().map(row => row.name);
+    `);
+
+    const actual = rows.map(row => row.name);
 
     assert.ok(expected.length > 0);
     assert.deepEqual(actual, expected);
+
   } finally {
-    db.close();
+    await db.close();
   }
 });
 
 // TC-071: Verify foreign key enforcement
-test('TC-071: Enforce foreign key constraints', () => {
-  const db = openDb(':memory:');
+test('TC-071: Enforce foreign key constraints', async () => {
+  const db = await openDb(':memory:');
 
   try {
-    const settings = db.prepare(
+    const settings = await db.get(
       'PRAGMA foreign_keys'
-    ).get();
+    );
 
     assert.equal(settings.foreign_keys, 1);
 
-    // Create isolated tables for testing.
-    db.exec(`
+    await db.exec(`
       CREATE TABLE testParent (
         id INTEGER PRIMARY KEY
       );
@@ -96,79 +100,90 @@ test('TC-071: Enforce foreign key constraints', () => {
       );
     `);
 
-    assert.throws(() => {
-      db.prepare(
-        'INSERT INTO testChild (id, parentId) VALUES (?, ?)'
-      ).run(1, 999);
-    }, /FOREIGN KEY constraint failed/);
+    await assert.rejects(
+      async () => {
+        await db.run(
+          'INSERT INTO testChild (id, parentId) VALUES (?, ?)',
+          [1, 999]
+        );
+      },
+      /FOREIGN KEY/i
+    );
 
   } finally {
-    db.close();
+    await db.close();
   }
 });
 
-
- // TC-072: Verify database persistence
-test('TC-072: Persist records after reopening', () => {
-  withTemporaryDatabase(dbPath => {
-    let db = openDb(dbPath);
+// TC-072: Verify database persistence
+test('TC-072: Persist records after reopening', async () => {
+  await withTemporaryDatabase(async dbPath => {
+    let db = await openDb(dbPath);
 
     try {
-      db.exec(`
+      await db.exec(`
         CREATE TABLE testRecord (
           id INTEGER PRIMARY KEY,
           name TEXT NOT NULL
         )
       `);
 
-      db.prepare(
-        'INSERT INTO testRecord (id, name) VALUES (?, ?)'
-      ).run(1, 'CTR Test Record');
+      await db.run(
+        'INSERT INTO testRecord (id, name) VALUES (?, ?)',
+        [1, 'CTR Test Record']
+      );
+
     } finally {
-      db.close();
+      await db.close();
     }
 
-    db = openDb(dbPath);
+    db = await openDb(dbPath);
 
     try {
-      const record = db.prepare(
-        'SELECT * FROM testRecord WHERE id = ?'
-      ).get(1);
+      const record = await db.get(
+        'SELECT * FROM testRecord WHERE id = ?',
+        [1]
+      );
 
       assert.equal(record.id, 1);
       assert.equal(record.name, 'CTR Test Record');
 
     } finally {
-      db.close();
+      await db.close();
     }
   });
 });
 
-
 // TC-073: Prevent duplicate migrations
-test('TC-073: Avoid duplicate migrations', () => {
-  withTemporaryDatabase(dbPath => {
-    let db = openDb(dbPath);
+test('TC-073: Avoid duplicate migrations', async () => {
+  await withTemporaryDatabase(async dbPath => {
+    let db = await openDb(dbPath);
     let original;
 
     try {
-      original = db.prepare(
+      const rows = await db.all(
         'SELECT name FROM schemaMigration ORDER BY name'
-      ).all();
+      );
+
+      original = rows.map(row => row.name);
+
     } finally {
-      db.close();
+      await db.close();
     }
 
-    db = openDb(dbPath);
+    db = await openDb(dbPath);
 
     try {
-      const afterReopen = db.prepare(
+      const rows = await db.all(
         'SELECT name FROM schemaMigration ORDER BY name'
-      ).all();
+      );
+
+      const afterReopen = rows.map(row => row.name);
 
       assert.deepEqual(afterReopen, original);
+
     } finally {
-      db.close();
+      await db.close();
     }
   });
 });

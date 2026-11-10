@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import {
   parseDateString,
   localDateString,
-  nextDateString,
   atLocalTime,
   offsetIso,
   parseLocalDateTime,
@@ -35,12 +34,8 @@ test('TC-003: Convert UTC to local date', () => {
     localDateString(date, 'America/Los_Angeles'),
     '2026-11-08'
   );
-
-  assert.equal(
-    nextDateString(date, 'America/Los_Angeles'),
-    '2026-11-09'
-  );
 });
+
 
 // TC-004: Convert Eastern time to UTC
 test('TC-004: Convert local posting time to UTC', () => {
@@ -148,15 +143,17 @@ test('TC-009: Accept valid local date-time', () => {
 
 // TC-010: Handle date changes across years
 test('TC-010: Handle year boundary correctly', () => {
-  const date = new Date('2027-01-01T03:30:00Z');
+  const before = new Date('2027-01-01T03:30:00Z');
+  const after = new Date('2027-01-01T05:30:00Z');
 
   assert.equal(
-    localDateString(date, 'America/New_York'),
+    localDateString(before, 'America/New_York'),
     '2026-12-31'
   );
 
   assert.equal(
-    nextDateString(date, 'America/New_York'),
+    localDateString(after, 'America/New_York'),
     '2027-01-01'
   );
 });
+
