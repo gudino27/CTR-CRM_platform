@@ -321,6 +321,9 @@ Test cases will record:
 | TC-069–073 | Database Operations |
 | TC-074–081 | Post API Validation |
 | TC-082–090 | Post Management Integration |
+| TC-091–105 | Manual Frontend Testing |
+| TC-106–111 | External Integration and Acceptance Testing |
+| TC-112–128 | Additional Security and Integration Testing |
 
 Detailed results are maintained separately in `testing/Test_Log.md`.
 
@@ -510,34 +513,70 @@ The following testing artifacts will be maintained in the repository:
 
 These artifacts will support the Testing section of the final capstone report and provide evidence of the project's verification process.
 
+
 ## 16. Current Testing Status
 
-As of November 9, 2026, the initial automated backend test suite has completed the following:
+As of November 9, 2026, automated backend testing for the CTR Social Scheduler has been completed.
+
+### 16.1 Automated Test Results
 
 | Status | Count |
 |---|---:|
-| Total Test Cases | 90 |
-| Passed | 87 |
+| Total Automated Tests | 107 |
+| Passed | 107 |
 | Failed | 0 |
-| Pending (TODO) | 3 |
-| **Executed Test Pass Rate** | **100%** |
+| Pending (TODO) | 0 |
+| Skipped | 0 |
+| **Automated Test Pass Rate** | **100%** |
 
-All 87 active tests passed in the latest execution.
+All 107 automated unit and integration tests passed during the final regression test.
 
-The three pending test cases relate to client-requested scheduling behavior.
+### 16.2 Completed Testing Areas
 
-The current automated tests cover date and time calculations, scheduling projections, image validation, Google Calendar event formatting, authentication setup, publishing payloads, database operations, and post management APIs.
+The automated tests verified:
 
-Frontend functional testing, external integrations, user acceptance testing, and final regression testing remain to be completed.
+- Date and time calculations
+- Recurring schedules and post rotation
+- Authentication and role-based permissions
+- Database operations and API validation
+- Post management and scheduling controls
+- Webhook publishing and failure handling
+- Google Calendar synchronization using mock clients
+- Image upload, deletion, and restoration
+- Notifications and activity logging
+
+Integration tests used isolated databases, local HTTP endpoints, and mock external services.
+
+### 16.3 Remaining Testing Activities
+
+Although all automated backend tests passed, the following activities remain:
+
+1. Manual frontend functionality testing.
+2. Live Google Calendar and Google Drive integration verification.
+3. Live n8n publishing workflow verification.
+4. End-to-end system testing.
+5. Final client acceptance testing.
+
+These activities are necessary to confirm complete system readiness.
+
+**Overall Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed. Final System Verification Pending.
 
 ## 17. Conclusion
 
-This test plan establishes a structured approach for verifying the CTR Social Scheduler application before final delivery.
+The CTR Social Scheduler completed automated backend testing on November 9, 2026.
 
-The testing process combines automated unit tests, integration tests, manual functional testing, end-to-end verification, and client acceptance testing.
+A total of 107 automated unit and integration tests were executed using the Node.js built-in test runner. All 107 tests passed, with zero failures, skipped tests, or pending automated tests.
 
-Initial backend testing has produced successful results for all 87 executed test cases. However, additional testing remains necessary to verify complete user workflows, external integrations, access controls, and the client's final requirements.
+The testing verified core backend functionality, including scheduling, post management, authentication, role-based permissions, database operations, webhook publishing, Google Calendar synchronization, image management, notifications, and activity logging.
 
-The test plan and accompanying test log will be updated as the project approaches completion.
+Integration tests used isolated databases, local API endpoints, and mock external services to prevent changes to production data.
 
-**Overall Testing Status: Initial Backend Testing Completed; Final System Testing In Progress.**
+The completed automated testing demonstrates that the tested backend components behave according to their expected requirements.
+
+However, successful automated testing does not establish complete system readiness. Manual frontend testing, live external integration verification, end-to-end testing, and client acceptance remain necessary.
+
+The testing results and supporting evidence are documented in Test_Cases.md and Test_Log.md.
+
+**Overall Testing Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed.
+
+**Remaining Work:** Final System Verification and Client Acceptance Testing.

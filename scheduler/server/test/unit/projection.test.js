@@ -363,3 +363,165 @@ test('TC-020: Skip unmatched slots', () => {
   );
 });
 
+
+ // TC-021: Holiday insertion shifts future colors
+test('TC-021: Holiday insertion shifts all later color rotations', () => {
+  // Generate the original January schedule.
+  const original = monthBlueprint(
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    1,
+    timeZone
+  );
+
+  // Insert a Blue holiday post on January 8.
+  const holiday = [{
+    date: '2026-01-08',
+    time: '12:00',
+    color: 'Blue',
+    blocksDay: true,
+  }];
+
+  // Generate the schedule with the holiday.
+  const updated = monthBlueprint(
+    platform,
+    scheduleRules,
+    postTypes,
+    2026,
+    1,
+    timeZone,
+    holiday
+  );
+
+  // The holiday must not change earlier slots.
+  const earlier = original.filter(
+    slot => slot.date < '2026-01-08'
+  );
+
+  for (const slot of earlier) {
+    const changed = updated.find(
+      s => s.date === slot.date && s.time === slot.time
+    );
+
+    assert.equal(changed.color, slot.color);
+  }
+
+  // All later colors must shift.
+  const later = original.filter(
+    slot => slot.date > '2026-01-08'
+  );
+
+  assert.ok(later.length > 0);
+
+  for (const slot of later) {
+    const changed = updated.find(
+      s => s.date === slot.date && s.time === slot.time
+    );
+
+    assert.equal(
+      changed.color,
+      slot.color === 'Blue' ? 'Purple' : 'Blue'
+    );
+  }
+
+  // Verify the change continues into February.
+  const februaryOriginal = monthBlueprint(
+    platform, scheduleRules, postTypes,
+    2026, 2, timeZone
+  );
+
+  const februaryUpdated = monthBlueprint(
+    platform, scheduleRules, postTypes,
+    2026, 2, timeZone, holiday
+  );
+
+  assert.equal(
+    februaryUpdated[0].color,
+    februaryOriginal[0].color === 'Blue'
+      ? 'Purple'
+      : 'Blue'
+  );
+
+  // Inserting a holiday must not change post types.
+  assert.deepEqual(
+    updated.map(slot => slot.postTypeId),
+    original.map(slot => slot.postTypeId)
+  );
+});
+
+
+ // TC-116: Verify biweekly recurring schedules
+test('TC-116: Generate biweekly posting slots correctly', () => {
+  const rule = [{
+    id: 1,
+    byDay: 'MO',
+    time: '13:00',
+    startDate: '2026-01-05',
+    endDate: null,
+    intervalWeeks: 2,
+    postTypeIds: [],
+    active: true,
+  }];
+
+  const platform = { usesColors: false };
+
+  const types = [
+    { id: 10, sortOrder: 1 },
+    { id: 20, sortOrder: 2 },
+  ];
+
+  const january = monthBlueprint(
+    platform, rule, types, 2026, 1, timeZone
+  );
+
+  const february = monthBlueprint(
+    platform, rule, types, 2026, 2, timeZone
+  );
+
+  const march = monthBlueprint(
+    platform, rule, types, 2026, 3, timeZone
+  );
+
+  // Posts occur every other Monday.
+  assert.deepEqual(
+    january.map(s => s.date),
+    ['2026-01-05', '2026-01-19']
+  );
+
+  assert.deepEqual(
+    february.map(s => s.date),
+    ['2026-02-02', '2026-02-16']
+  );
+
+  assert.deepEqual(
+    march.map(s => s.date),
+    ['2026-03-02', '2026-03-16', '2026-03-30']
+  );
+
+  // Post type rotation continues across months.
+  assert.deepEqual(
+    [...january, ...february, ...march]
+      .map(s => s.postTypeId),
+    [10, 20, 10, 20, 10, 20, 10]
+  );
+
+  // The local posting time remains 1 PM.
+  assert.ok(
+    [...january, ...february, ...march]
+      .every(s => s.time === '13:00')
+  );
+
+  // Verify daylight saving time conversion.
+  assert.equal(
+    january[0].scheduledAt,
+    '2026-01-05T18:00:00.000Z'
+  );
+
+  assert.equal(
+    march[1].scheduledAt,
+    '2026-03-16T17:00:00.000Z'
+  );
+});
+

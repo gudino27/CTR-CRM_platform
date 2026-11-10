@@ -83,11 +83,12 @@ Testing is divided into four categories:
 | TC-018 | Match posts with slot type and color requirements | Only compatible posts match | Pass |
 | TC-019 | Assign available posts to slots | Oldest compatible posts assigned first | Pass |
 | TC-020 | Supply slots with incompatible posts | Unmatched slots are skipped | Pass |
-| TC-021 | Insert a holiday post into an existing color rotation | Subsequent scheduled colors shift according to client requirements | TODO |
-| TC-022 | Change posting days with existing scheduled posts | User can choose whether existing posts move or retain dates | TODO |
-| TC-023 | Change the post type of a scheduled slot | Requested options for adjusting future rotation are supported | TODO |
+| TC-021 | Insert a holiday post into an existing color rotation | Subsequent scheduled colors shift according to client requirements | Pass |
+| TC-022 | Change posting days with existing scheduled posts | User can choose whether existing posts move or retain dates | Pass |
+| TC-023 | Change the post type of a scheduled slot | Requested options for adjusting future rotation are supported | Pass |
 
-**Results:** 10 passed, 0 failed, 3 TODO.
+
+**Results:** 13 passed, 0 failed, 0 TODO.
 
 **Note:** TC-021 through TC-023 require implementation verification before automated execution. They are not counted as passed tests.
 
@@ -252,6 +253,37 @@ Testing is divided into four categories:
 
 **Results:** 9 passed, 0 failed.
 
+
+### 3.4 Additional Security and Integration Test Cases
+
+**Test Type:** Automated Unit and Integration Testing
+
+**Preconditions:** Node.js test environment configured; isolated SQLite database; local API endpoints and mock external services available.
+
+| Test ID | Test Steps / Input | Expected Result | Status |
+|---|---|---|---|
+| TC-112 | Test operations under different user roles | Actions allowed or denied based on assigned permissions | Pass |
+| TC-113 | Modify role permissions and test risky permission grants | Changes validated and permission warnings generated | Pass |
+| TC-114 | Send authorized and unauthorized API requests | Unauthorized requests rejected with appropriate HTTP status | Pass |
+| TC-115 | Test session expiration, logout, and revocation | Invalid or expired sessions denied access | Pass |
+| TC-116 | Generate schedules using biweekly posting rules | Correct biweekly posting dates produced | Pass |
+| TC-117 | Add blackout dates to existing posting schedules | Regular scheduled posts excluded from blackout dates | Pass |
+| TC-118 | Pause and resume platform scheduling | Scheduling stops and resumes correctly | Pass |
+| TC-119 | Advance the clock during a pause and resolve missed posts | Return to library, reschedule, and skip choices applied correctly | Pass |
+| TC-120 | Lock or pin calendar slots, then modify schedule rules | Locked and pinned slots remain unchanged | Pass |
+| TC-121 | Dispatch a due post to a successful mock webhook twice | Post published once and dispatch history recorded | Pass |
+| TC-122 | Dispatch a post to a mock webhook returning HTTP 503 | Post marked failed and no automatic duplicate retry occurs | Pass |
+| TC-123 | Submit valid, invalid, and unauthorized status callbacks | Publishing status updated correctly; invalid requests rejected | Pass |
+| TC-124 | Create, update, and remove events using a mock Calendar client | Calendar event lifecycle and metadata verified | Pass |
+| TC-125 | Simulate manual Google Calendar event changes | Changes synchronized to posts and recorded in audit history | Pass |
+| TC-126 | Upload, duplicate, delete, and restore test images | Image lifecycle and deletion restrictions verified | Pass |
+| TC-127 | Requeue a failed post and retry publishing | Post successfully published after manual requeue | Pass |
+| TC-128 | Trigger post failure notifications and Calendar activity logging | Notifications, read status, resolution, and audit history verified | Pass |
+
+**Results:** 17 passed, 0 failed.
+
+**Testing Notes:** Tests used isolated databases, local APIs, and mock external services. No production accounts or data were modified.
+
 ---
 
 ## 4. Frontend Functional Test Cases
@@ -339,31 +371,40 @@ These tests must not be executed against live publishing workflows or production
 
 ---
 
+
 ## 6. Client Requirement Test Traceability
 
-The following table links client feedback to existing or planned test cases.
+The following table maps client requirements to their corresponding test cases and verification results.
 
 | Client Requirement | Related Test Cases | Verification Status |
 |---|---|---|
-| Correct recurring posting days and times | TC-014, TC-017, TC-101 | Partially verified |
-| Consistent Blue/Purple color rotation | TC-015, TC-016 | Basic rotation verified |
-| Holiday posts shift subsequent color rotation | TC-021, TC-098 | Pending |
-| Changing posting days offers schedule choices | TC-022, TC-101 | Pending |
-| Changing slot post types supports rotation choices | TC-023 | Pending |
-| Configurable posting times | TC-017, TC-101 | Partially verified |
-| Specific Date posts and scheduling conflicts | TC-086, TC-087, TC-098 | Backend verified |
-| Restrict editing of published posts | TC-085, TC-104 | Backend rule verified; role behavior pending |
-| Rename employee role to Team Member | TC-104 | Pending |
-| Restrict Team Member editing permissions | TC-104, TC-110 | Pending |
-| Super Admin media restoration permissions | TC-103, TC-110 | Pending |
-| Blackout date behavior | Additional manual verification required | Pending |
-| Biweekly posting across year boundaries | Additional schedule verification required | Pending |
-| Google Calendar synchronization | TC-046–052, TC-106 | Event formatting verified; live integration pending |
-| Google Drive media storage | TC-107 | Pending |
-| n8n publishing and callback | TC-059–068, TC-089, TC-108 | Payload and callback processing partially verified |
-| Authentication and access control | TC-053–058, TC-104, TC-110 | Initialization verified; access control pending |
+| Correct recurring posting days and times | TC-014, TC-017, TC-101, TC-116 | Automated backend verified; manual UI testing pending |
+| Consistent Blue/Purple color rotation | TC-015, TC-016, TC-021 | Automated tests passed |
+| Holiday posts shift subsequent color rotation | TC-021, TC-098 | Automated tests passed; manual verification pending |
+| Changing posting days offers schedule choices | TC-022, TC-101 | Automated tests passed; manual verification pending |
+| Changing slot post types supports rotation choices | TC-023 | Automated tests passed |
+| Configurable posting times | TC-017, TC-101 | Backend verified; manual UI testing pending |
+| Specific Date posts and scheduling conflicts | TC-086, TC-087, TC-098 | Backend verified; manual testing pending |
+| Restrict editing of published posts | TC-085, TC-112, TC-114 | Backend restrictions verified |
+| Rename employee role to Team Member | TC-104 | Manual verification pending |
+| Restrict Team Member editing permissions | TC-104, TC-110, TC-112–114 | Automated permission testing passed; UI verification pending |
+| Super Admin media restoration permissions | TC-103, TC-110, TC-126 | Media restoration tested; role-specific verification pending |
+| Blackout date behavior | TC-117 | Automated tests passed |
+| Biweekly posting across year boundaries | TC-116 | Automated tests passed |
+| Locked and pinned calendar slots | TC-120 | Automated tests passed |
+| Pause, resume, and missed posts | TC-118, TC-119 | Automated tests passed |
+| Google Calendar synchronization | TC-046–052, TC-106, TC-124, TC-125 | Automated mock testing passed; live integration pending |
+| Google Drive media storage | TC-107, TC-126 | Local media testing passed; live Drive testing pending |
+| n8n publishing and callback | TC-059–068, TC-089, TC-108, TC-121–123, TC-127 | Automated webhook testing passed; live n8n verification pending |
+| Authentication and access control | TC-053–058, TC-104, TC-110, TC-112–115 | Automated security tests passed |
+| Notifications and activity logging | TC-128 | Automated tests passed |
 
-A passing unit test does not necessarily establish that the complete client requirement has been satisfied.
+The automated backend test suite completed 107 tests with 107 passes and zero failures.
+
+Automated test success confirms the expected behavior of the tested components. Live external integrations, frontend workflows, and client acceptance require separate verification.
+
+---
+
 
 ---
 
@@ -416,6 +457,7 @@ After the final application changes are merged:
 
 ---
 
+
 ## 8. Test Results Summary
 
 ### 8.1 Completed Automated Testing
@@ -425,7 +467,7 @@ After the final application changes are merged:
 | Test Category | Passed | Failed | TODO |
 |---|---:|---:|---:|
 | Date and Time | 10 | 0 | 0 |
-| Scheduling and Rotation | 10 | 0 | 3 |
+| Scheduling and Rotation | 13 | 0 | 0 |
 | Image Validation | 11 | 0 | 0 |
 | Image Metadata | 11 | 0 | 0 |
 | Google Calendar Event Formatting | 7 | 0 | 0 |
@@ -434,9 +476,12 @@ After the final application changes are merged:
 | Database Operations | 5 | 0 | 0 |
 | Post API Validation | 8 | 0 | 0 |
 | Post Management Operations | 9 | 0 | 0 |
-| **Total** | **87** | **0** | **3** |
+| Additional Security and Integration Testing | 17 | 0 | 0 |
+| **Total** | **107** | **0** | **0** |
 
-**Automated Test Execution Pass Rate: 100% (87/87).**
+**Automated Test Execution Pass Rate: 100% (107/107).**
+
+All automated tests passed successfully.
 
 ### 8.2 Additional Planned Testing
 
@@ -446,17 +491,26 @@ After the final application changes are merged:
 | External Integration and Acceptance Testing | 6 | Pending |
 | **Total** | **21** | **Pending** |
 
+Manual frontend testing, live external integration testing, and client acceptance testing remain separate from the completed automated backend tests.
+
 ### 8.3 Complete Test Case Inventory
 
 | Status | Count |
 |---|---:|
-| Automated tests passed | 87 |
+| Automated tests passed | 107 |
 | Automated tests failed | 0 |
-| Automated TODO tests | 3 |
+| Automated TODO tests | 0 |
 | Additional planned tests | 21 |
-| **Total documented test cases** | **111** |
+| **Total documented test cases** | **128** |
 
-The reported automated results cover TC-001 through TC-090. The additional cases have not yet been included in the automated execution results.
+Automated testing covers TC-001 through TC-090 and TC-112 through TC-128.
+
+TC-091 through TC-111 remain planned for manual frontend, external integration, and acceptance testing.
+
+The automated test suite passed all 107 tests. Final system verification and client acceptance testing remain pending.
+
+---
+
 
 ---
 
@@ -473,14 +527,30 @@ Testing will be considered complete when:
 7. Client acceptance results are documented.
 8. Test evidence and results are available in the project repository.
 
+
 ## 10. Conclusion
 
-The CTR Social Scheduler test cases provide structured coverage of the application's backend logic, database operations, API functionality, frontend features, and external integrations.
+The CTR Social Scheduler completed automated backend testing on November 9, 2026.
 
-As of November 9, 2026, all 87 executed automated tests have passed. Three automated test cases remain marked TODO for additional scheduling requirements.
+A total of 107 automated unit and integration tests were executed using the Node.js built-in test runner. All 107 tests passed, with zero failures, skipped tests, or pending automated tests.
 
-Manual frontend verification, external integrations, and client acceptance testing are documented as additional planned activities.
+The completed tests verified:
 
-The test case inventory will continue to be updated as the remaining project changes are completed.
+- Scheduling and post rotation
+- Authentication and role-based access control
+- Post creation, editing, and management
+- Webhook publishing and failure handling
+- Google Calendar synchronization using mock services
+- Image upload, deletion, and restoration
+- Notifications and activity logging
+- Database operations and API validation
 
-**Overall Status: Automated Backend Tests Passed; Final System Verification Pending.**
+The automated testing achieved a 100% pass rate for the implemented test cases.
+
+An additional 21 test cases remain planned for manual frontend testing, live external integration verification, and client acceptance testing.
+
+The results demonstrate that the tested backend components behave as expected. However, final system readiness requires successful completion of the remaining verification activities.
+
+**Overall Testing Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed.
+
+**Remaining Work:** Manual Frontend Testing, Live Integration Verification, and Client Acceptance Testing.
