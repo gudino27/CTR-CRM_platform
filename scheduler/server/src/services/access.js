@@ -111,7 +111,8 @@ async function summarize(db, req, route, before, after, fields) {
   switch (route.action) {
     case 'post.create': return `Created ${platformName(after?.platformId)} post "${snippet(after?.caption)}"`;
     case 'post.update': return `Changed ${fieldList(fields)} on "${snippet(after?.caption ?? before?.caption)}"`;
-    case 'post.requeue': return `Requeued failed post "${snippet(before?.caption)}"`;
+    case 'post.requeue': return `Requeued ${before?.status === 'posted' ? 'unconfirmed' : 'failed'} post "${snippet(before?.caption)}"`;
+    case 'post.confirm': return `Marked ${platformName(before?.platformId)} post "${snippet(before?.caption)}" as published`;
     case 'post.delete': return `Deleted ${platformName(before?.platformId)} post "${snippet(before?.caption)}"`;
     case 'post.status': return `n8n reported ${body.status}${body.error ? `: ${body.error}` : ''}`;
     case 'slot.update': return `Changed ${fieldList(fields)} on the ${platformName(before?.platformId)} slot of ${before?.date ?? ''}`.trim();

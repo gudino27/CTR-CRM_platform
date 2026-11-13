@@ -27,7 +27,7 @@ const dayNumber = (date) => {
 };
 // Weeks start on Sunday, as on US calendars (RRULE WKST=SU), so "every other week"
 // counts the week holding the start date as the first; day 0 was a Thursday.
-// Not yet confirmed: Sunday-start weeks, with the start date's week as week 1.
+// Sunday-start weeks, with the start date's week as week 1 (counting carries across years).
 const weekOf = (day) => Math.floor((day + 4) / 7);
 
 /**

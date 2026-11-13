@@ -21,6 +21,7 @@
  *   archivePageSize                 posts per page on the Archive page
  *   archiveCaptionChars             how much of a caption each Archive row shows
  *   activityPageSize                entries per page on the Activity page
+ *   googleSignInScriptUrl, googleButtonOptions  the "Sign in with Google" script and button
  */
 
 /**
@@ -274,3 +275,25 @@ export const activityPageSize = 100;
  *   check the color is preselected with the "Suggested so the colors keep alternating" note.
  */
 export const suggestColorDelayMs = 250;
+
+/**
+ * The "Sign in with Google" button on the sign-in page (pages/SignIn.jsx): the Google Identity
+ * Services script it loads, and how the button looks.
+ *
+ * Usage:
+ *   google.accounts.id.renderButton(element, googleButtonOptions)   (pages/SignIn.jsx)
+ *
+ * Takes:
+ *   googleSignInScriptUrl - the script Google publishes for its sign-in button
+ *   googleButtonOptions   - Google's button settings: type 'standard' or 'icon', theme
+ *                           'outline' / 'filled_blue' / 'filled_black', size 'large' / 'medium' /
+ *                           'small', text 'signin_with' / 'signin' / 'continue_with', shape
+ *                           'rectangular' / 'pill', width in pixels
+ *
+ * When editing:
+ *   The client ID and Workspace domain are not here: the server sends them
+ *   (GOOGLE_SIGNIN_CLIENT_ID and GOOGLE_WORKSPACE_DOMAIN in .env). After changing: rebuild the
+ *   client and check the button on the sign-in page.
+ */
+export const googleSignInScriptUrl = 'https://accounts.google.com/gsi/client';
+export const googleButtonOptions = { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', width: 300 };

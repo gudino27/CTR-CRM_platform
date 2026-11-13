@@ -25,6 +25,7 @@ const KIND_LABELS = {
   calendarTextEdit: 'Calendar text edit',
   postFailed: 'Failed post',
   daySkipped: 'Skipped day',
+  notConfirmed: 'Not confirmed',
 };
 
 /**
@@ -224,7 +225,7 @@ export default function Notifications() {
                   onChoose={(choice) => choose(n.id, choice)} />
               )}
               <div className="notification-links">
-                {n.postId && (n.kind === 'postFailed' || n.kind === 'daySkipped' || n.kind === 'calendarClash') && <Link to="/library">Open the Library</Link>}
+                {n.postId && (n.kind === 'postFailed' || n.kind === 'daySkipped' || n.kind === 'calendarClash' || n.kind === 'notConfirmed') && <Link to="/library">Open the Library</Link>}
                 {n.kind === 'daySkipped' && <Link to="/calendar">Open the Calendar</Link>}
                 {n.postId && permissions.viewActivity && <Link to={`/activity?postId=${n.postId}`}>Post {n.postId} history</Link>}
                 {!n.readAt && <button type="button" className="link-button" onClick={() => markRead(n.id)}>Mark read</button>}

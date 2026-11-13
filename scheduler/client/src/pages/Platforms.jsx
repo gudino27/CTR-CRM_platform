@@ -1,14 +1,12 @@
 /**
- * Platforms page (deliverable 2): each platform's schedule rules, calendar color, pause
- * switch and post types, plus the blackout dates section.
+ * Platforms page (deliverable 2): each platform's schedule rules, calendar color and post
+ * types, plus the blackout dates section.
  * Saving a rule regenerates the platform's future, unlocked slots and updates its calendar events.
  * Controls the signed-in user may not use are left out rather than refused by the server.
  *
  * What lives here:
  *   days            rule day codes and labels, Monday first
  *   Platforms       the page (route /platforms)
- *   PauseControl    pause / resume posting for one platform
- *   ResumeChoices   a choice per post missed during a pause, applied on resume
  *   ruleTimeHint    "Your time: ..." under a rule's time, for viewers elsewhere
  *   describeRule    one-line summary of a rule
  *   ScheduleRules   a platform's list of rules (read-only or editable)
@@ -25,36 +23,34 @@ import { calendarColors } from "../calendarColors.js";
 import { useCurrentUser } from "../currentUser.js";
 import { appTimeZone, formatSlotTime, viewerTime, zoneCity, zonedParts, zonedToInstant } from "../time.js";
 import BlackoutDates from "../components/BlackoutDates.jsx";
-import { formatDateTime } from "../time.js"; // missed posts' times
-import { YourTimeHint } from "../components/TimeZone.jsx"; // viewer's own time under a new date
 
-// Rule day codes (as stored in scheduleRule.byDay) with their labels, Monday first.
+// Rule day codes (as stored in scheduleRule.byDay) with their labels, Sunday first like the Calendar.
 // The order is the order days are saved in byDay and shown in summaries.
 const days = [
+  ["SU", "Sunday"],
   ["MO", "Monday"],
   ["TU", "Tuesday"],
   ["WE", "Wednesday"],
   ["TH", "Thursday"],
   ["FR", "Friday"],
   ["SA", "Saturday"],
-  ["SU", "Sunday"],
 ];
 
 /**
- * The Platforms page: blackout dates on top, then one block per platform with its pause
- * control, schedule rules, Google Calendar color and post types.
+ * The Platforms page: blackout dates on top, then one block per platform with its
+ * schedule rules, Google Calendar color and post types.
  *
  * Usage:
  *   Rendered by App.jsx for the /platforms route: <Platforms />
  *
  * Returns:
  *   The page section. Each part is editable only with its permission: blackouts and rules
- *   need editSchedules, pause and calendar color need editPlatforms, post types need
+ *   need editSchedules, calendar color needs editPlatforms, post types need
  *   managePostTypes; otherwise they are shown read-only.
  *
  * How it works:
  *   1. Loads all platforms (with rules and post types) once.
- *   2. Rules, post types and pause save right away; the server returns the whole
+ *   2. Rules and post types save right away; the server returns the whole
  *      platform, which replaces the old copy (replacePlatform).
  *   3. Calendar colors are only changed locally until "Save Calendar Colors", which
  *      PATCHes every platform's calendarColorId.
@@ -126,15 +122,9 @@ export default function Platforms() {
 
       {platforms.map((platform) => (
         <div key={platform.id}>
-          <h2>
-            {platform.name}
-            {platform.paused && <span className="platform-paused-badge">Paused</span>}
-          </h2>
+          <h2>{platform.name}</h2>
 
-          <PauseControl platform={platform} canEdit={Boolean(permissions.editPlatforms)} onChange={replacePlatform} />
-
-          <ScheduleRules platform={platform} canEdit={Boolean(permissions.editSchedules)}
-            canPause={Boolean(permissions.editPlatforms)} onChange={replacePlatform} />
+          <ScheduleRules platform={platform} canEdit={Boolean(permissions.editSchedules)} onChange={replacePlatform} />
 
           {permissions.editPlatforms ? (
             <div>
@@ -183,218 +173,9 @@ export default function Platforms() {
   );
 }
 
-/**
- * Pause / resume posting for one platform. Pausing stops a platform's posting without
- * touching its rules.
- *
- * Usage:
- *   Rendered by Platforms: <PauseControl platform={platform} canEdit={...} onChange={replacePlatform} />
- *
- * Takes:
- *   platform - the platform (paused, name, id)
- *   canEdit  - true with editPlatforms; otherwise only the paused notice shows
- *   onChange - called with the platform the server returns
- *
- * Returns:
- *   A paused notice (when paused), a hint, and the Pause / Resume button with an inline
- *   confirm for pausing.
- *
- * How it works:
- *   The server keeps the slots and which post is in each, but takes the posts' times and
- *   Google Calendar events away so nothing sends; resuming puts them back (posts whose
- *   slot passed go to the next matching slot, Specific Date posts whose time passed are
- *   listed as failed). Pausing asks first because the calendar events disappear.
- *   Resuming first asks the server which posts passed during the pause; with
- *   none it resumes at once, otherwise ResumeChoices opens so the user picks per post.
- */
-function PauseControl({ platform, canEdit, onChange }) {
-  const [confirming, setConfirming] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const [missed, setMissed] = useState(null); // posts that passed while paused, while choosing
-
-  async function setPaused(paused) {
-    try {
-      onChange(await api.updatePlatform(platform.id, { paused }));
-      setConfirming(false);
-      setMessage("");
-    } catch (error) {
-      setMessage(error.message);
-    }
-  }
-
-  // List what passed during the pause first; nothing missed resumes straight away
-  async function startResume() {
-    try {
-      const posts = await api.missedPosts(platform.id);
-      if (posts.length === 0) await setPaused(false);
-      else setMissed(posts);
-    } catch (error) {
-      setMessage(error.message);
-    }
-  }
-
-  return (
-    <div className={platform.paused ? "platform-pause platform-pause-on" : "platform-pause"}>
-      {platform.paused ? (
-        <p role="status">
-          <strong>{platform.name} is paused.</strong> Nothing is scheduled or sent, and its posts are off
-          Google Calendar. Resuming puts the posts back in their slots and first lists any post whose time
-          passed, so you can choose what happens to each.
-        </p>
-      ) : (
-        canEdit && !confirming && <p className="field-hint">Pause to stop all {platform.name} posting for now; the schedule stays as it is.</p>
-      )}
-
-      {canEdit && (platform.paused ? (
-        missed ? (
-          <ResumeChoices
-            platform={platform}
-            posts={missed}
-            onDone={(saved) => { setMissed(null); onChange(saved); }}
-            onCancel={() => setMissed(null)}
-          />
-        ) : (
-          <button type="button" onClick={startResume}>Resume posting</button>
-        )
-      ) : confirming ? (
-        <span role="alert">
-          Pause {platform.name}? Nothing posts until you resume, and its posts come off Google Calendar meanwhile.{" "}
-          <button type="button" className="remove-button" onClick={() => setPaused(true)}>Yes, pause</button>
-          <button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Keep posting</button>
-        </span>
-      ) : (
-        <button type="button" className="secondary-button" onClick={() => setConfirming(true)}>Pause posting</button>
-      ))}
-
-      {message && <p className="error-text">{message}</p>}
-    </div>
-  );
-}
-
 // "Fri, Dec 4" for a "YYYY-MM-DD" (a calendar day, so no time zone shift)
 const calendarDay = (date) => new Date(`${date}T12:00:00Z`)
   .toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
-
-// What each choice means, as the select shows it
-const resumeActions = {
-  library: "Back to the library",
-  date: "Pick a new date",
-  skip: "Skip it",
-};
-
-/**
- * The resume step after a pause: each queued post whose date passed while the
- * platform was paused, with a choice per post, applied in one request.
- *
- * Usage:
- *   Rendered by PauseControl: <ResumeChoices platform={platform} posts={missed} onDone={...} onCancel={...} />
- *
- * Takes:
- *   platform - the paused platform
- *   posts    - GET /api/platforms/:id/missed rows ({ id, kind, caption, postTypeName, color,
- *              missedAt, canReturnToLibrary })
- *   onDone   - called with the platform the server returns after resuming
- *   onCancel - closes the list; the platform stays paused
- *
- * Returns:
- *   A list of the missed posts, each with "What to do" (no choice, Back to the library unless it
- *   is date-only like Holiday, Pick a new date with date and New York time fields, Skip it),
- *   then "Resume posting" and "Stay paused".
- *
- * How it works:
- *   1. No choice keeps today's behavior: a library post goes back to the library and fills its
- *      next matching slot; a Specific Date post is marked failed to requeue later.
- *   2. "Skip it" marks it failed with the reason "Skipped after pause".
- *   3. Resume sends only the posts with a choice (POST /api/platforms/:id/resume); a missing
- *      new date is caught here first.
- *
- * When editing:
- *   The server checks everything again (routes/platforms.js) and writes the audit entries.
- */
-function ResumeChoices({ platform, posts, onDone, onCancel }) {
-  const [choices, setChoices] = useState({}); // postId -> { action, date, time }
-  const [message, setMessage] = useState("");
-  const setChoice = (id, changes) => setChoices((current) => ({ ...current, [id]: { ...current[id], ...changes } }));
-
-  async function resume() {
-    const list = [];
-    for (const post of posts) {
-      const choice = choices[post.id];
-      if (!choice?.action) continue;
-      if (choice.action === "date") {
-        if (!choice.date || !choice.time) return setMessage("Choose a date and a time for each post with \"Pick a new date\".");
-        list.push({ postId: post.id, action: "date", fixedAt: `${choice.date}T${choice.time}` });
-      } else {
-        list.push({ postId: post.id, action: choice.action });
-      }
-    }
-    try {
-      onDone(await api.resumePlatform(platform.id, list));
-    } catch (error) {
-      setMessage(error.message);
-    }
-  }
-
-  return (
-    <div className="resume-choices">
-      <p>
-        <strong>{posts.length} {platform.name} post{posts.length === 1 ? "" : "s"} missed {posts.length === 1 ? "its" : "their"} time
-        during the pause.</strong> Choose what happens to each, then resume. With no choice, a library post goes back to the
-        library and a Specific Date post is marked failed.
-      </p>
-      <ul className="resume-choice-list">
-        {posts.map((post) => {
-          const choice = choices[post.id] ?? {};
-          const selectId = `resume-${post.id}`;
-          return (
-            <li key={post.id}>
-              <p>
-                <strong>{post.kind === "fixed" ? "Specific Date" : "Library"}</strong>
-                {post.postTypeName && ` · ${post.postTypeName}`}{post.color && ` · ${post.color}`}
-                {" · was due "}{formatDateTime(post.missedAt)}
-              </p>
-              <p className="field-hint">{post.caption.length > 80 ? `${post.caption.slice(0, 80)}...` : post.caption}</p>
-              <label htmlFor={selectId}>What to do</label>
-              <select id={selectId} value={choice.action ?? ""} onChange={(event) => setChoice(post.id, { action: event.target.value })}>
-                <option value="">
-                  {post.kind === "fixed" ? "No choice (marked failed)" : "No choice (back to the library)"}
-                </option>
-                {post.canReturnToLibrary && <option value="library">{resumeActions.library}</option>}
-                <option value="date">{resumeActions.date}</option>
-                <option value="skip">{resumeActions.skip}</option>
-              </select>
-              {!post.canReturnToLibrary && (
-                <p className="field-hint">{post.postTypeName ?? "This post"} is date-only, so it cannot go back to the library.</p>
-              )}
-              {choice.action === "date" && (
-                <div className="date-time-row">
-                  <div>
-                    <label htmlFor={`${selectId}-date`}>Date</label>
-                    <input id={`${selectId}-date`} type="date" value={choice.date ?? ""}
-                      onChange={(event) => setChoice(post.id, { date: event.target.value })} />
-                  </div>
-                  <div>
-                    <label htmlFor={`${selectId}-time`}>Time ({zoneCity()})</label>
-                    <input id={`${selectId}-time`} type="time" value={choice.time ?? ""}
-                      onChange={(event) => setChoice(post.id, { time: event.target.value })} />
-                  </div>
-                  <YourTimeHint date={choice.date} time={choice.time} />
-                </div>
-              )}
-              {choice.action === "skip" && <p className="field-hint">Marked failed with the reason "Skipped after pause".</p>}
-            </li>
-          );
-        })}
-      </ul>
-      <div className="post-actions">
-        <button type="button" onClick={resume}>Resume posting</button>
-        <button type="button" className="secondary-button" onClick={onCancel}>Stay paused</button>
-      </div>
-      {message && <p className="error-text">{message}</p>}
-    </div>
-  );
-}
 
 /**
  * The hint under a rule's time field, for viewers outside New York.
@@ -442,12 +223,11 @@ function describeRule(rule) {
  * A platform's repeating schedules. Its slots are every date and time any active rule makes.
  *
  * Usage:
- *   Rendered by Platforms: <ScheduleRules platform={platform} canEdit={...} canPause={...} onChange={replacePlatform} />
+ *   Rendered by Platforms: <ScheduleRules platform={platform} canEdit={...} onChange={replacePlatform} />
  *
  * Takes:
  *   platform - the platform with rules and postTypes
  *   canEdit  - true with editSchedules; false shows each rule's summary and types only
- *   canPause - true with editPlatforms (changes a hint in RuleForm)
  *   onChange - called with the platform the server returns after any rule change
  *
  * Returns:
@@ -457,12 +237,12 @@ function describeRule(rule) {
  *   Changing a rule moves only future slots that are not locked or pinned; posts in slots
  *   that go away return to the library. For "every 2 weeks", weeks start on Sunday and
  *   the week of the start date is the first. The last active rule cannot be turned off or
- *   deleted (onlyActive); pausing is the way to stop posting.
+ *   deleted (onlyActive).
  *
  * When editing:
  *   Locked and pinned slots stay where they are when a rule changes (to be confirmed).
  */
-function ScheduleRules({ platform, canEdit, canPause, onChange }) {
+function ScheduleRules({ platform, canEdit, onChange }) {
   const [adding, setAdding] = useState(false);
   const rules = platform.rules ?? [];
   const activeCount = rules.filter((rule) => rule.active).length;
@@ -505,7 +285,6 @@ function ScheduleRules({ platform, canEdit, canPause, onChange }) {
               platform={platform}
               rule={rule}
               onlyActive={rule.active && activeCount <= 1}
-              canPause={canPause}
               onSaved={onChange}
             />
           </li>
@@ -532,7 +311,7 @@ const blankRule = { label: "", byDay: "", intervalWeeks: 1, time: "", startDate:
  * Without `rule` it makes a new one.
  *
  * Usage:
- *   <RuleForm platform={platform} rule={rule} onlyActive={...} canPause={...} onSaved={onChange} />
+ *   <RuleForm platform={platform} rule={rule} onlyActive={...} onSaved={onChange} />
  *   <RuleForm platform={platform} onSaved={...} onCancel={...} />   // new rule
  *
  * Takes:
@@ -540,7 +319,6 @@ const blankRule = { label: "", byDay: "", intervalWeeks: 1, time: "", startDate:
  *   rule       - the saved rule, or undefined for a new one
  *   onlyActive - true when this is the platform's only active rule: Active is locked on
  *                and Delete is hidden; default false
- *   canPause   - true with editPlatforms (the hint then points to Pause posting); default false
  *   onSaved    - called with the platform the server returns
  *   onCancel   - optional; shows a Cancel button (new rules)
  *
@@ -561,7 +339,7 @@ const blankRule = { label: "", byDay: "", intervalWeeks: 1, time: "", startDate:
  *      to the new days" (default, today's behavior) or "Keep posts ... where they are; only new
  *      posts follow the new days" (keepPosts), with the count, before committing.
  */
-function RuleForm({ platform, rule, onlyActive = false, canPause = false, onSaved, onCancel }) {
+function RuleForm({ platform, rule, onlyActive = false, onSaved, onCancel }) {
   const [draft, setDraft] = useState(rule ?? blankRule);
   const [message, setMessage] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -583,7 +361,7 @@ function RuleForm({ platform, rule, onlyActive = false, canPause = false, onSave
     setMessage("");
   }
 
-  // Adds or removes a day; byDay is always saved in the days table's order (MO first)
+  // Adds or removes a day; byDay is always saved in the days table's order (SU first)
   function toggleDay(code) {
     const next = selectedDays.includes(code) ? selectedDays.filter((d) => d !== code) : [...selectedDays, code];
     change({ byDay: days.map(([d]) => d).filter((d) => next.includes(d)).join(",") });
@@ -731,10 +509,7 @@ function RuleForm({ platform, rule, onlyActive = false, canPause = false, onSave
         Active
       </label>
       {onlyActive && (
-        <p className="field-hint">
-          The platform needs at least one active rule.{" "}
-          {canPause ? "To stop posting, use Pause posting at the top of this platform." : "Pausing the platform stops posting."}
-        </p>
+        <p className="field-hint">The platform needs at least one active rule.</p>
       )}
 
       {choice && (

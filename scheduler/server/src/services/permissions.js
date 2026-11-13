@@ -18,6 +18,8 @@ export const ROLES = ['superAdmin', 'admin', 'manager', 'employee'];
 // The role key 'employee' is stored in the database; people read it as "Team member"
 export const ROLE_LABELS = { superAdmin: 'Super admin', admin: 'Admin', manager: 'Manager', employee: 'Team member' };
 
+// Default rows per role: migrations 005, 009, 013 and 014; 016 then gives managers every
+// permission except manageUsers. Super admins change them on the Permissions page.
 export const PERMISSIONS = [
   { key: 'createPosts', label: 'Create posts' },
   { key: 'editPosts', label: 'Edit posts (and requeue failed ones)' },
@@ -32,7 +34,8 @@ export const PERMISSIONS = [
   { key: 'viewActivity', label: 'See the activity log' },
   // Notification area; defaults in migration 009 (admin and manager yes, employee no)
   { key: 'viewNotifications', label: 'See notifications' },
-  // Archive page; defaults in migration 013 (admin yes, manager and employee no)
+  // Archive page; defaults in migration 013 (admin yes, manager and employee no; 016 turns
+  // it on for managers)
   { key: 'archivePosts', label: 'Archive old posts' },
   // Scheduled posts; defaults in migration 014 (admin and manager yes, employee no).
   // Checked by routes/posts.js on top of editPosts, see isScheduled there.
@@ -220,6 +223,8 @@ export const ROUTES = [
   // A scheduled post also needs editScheduledPosts, which routes/posts.js checks itself
   route('PATCH', `/posts/${n}`, 'editPosts', { entity: 'post', action: 'post.update' }),
   route('POST', `/posts/${n}/requeue`, 'editPosts', { entity: 'post', action: 'post.requeue' }),
+  // "Mark as published" for a sent post n8n never confirmed (routes/posts.js)
+  route('POST', `/posts/${n}/confirm`, 'editPosts', { entity: 'post', action: 'post.confirm' }),
   route('DELETE', `/posts/${n}`, 'deletePosts', { entity: 'post', action: 'post.delete' }),
 
   route('PATCH', `/slots/${n}`, 'editSlots', { entity: 'slot', action: 'slot.update' }),
@@ -232,10 +237,8 @@ export const ROUTES = [
   route('POST', `/platforms/${n}/rules`, 'editSchedules', { entity: 'platform', action: 'scheduleRule.create' }),
   route('PATCH', `/platforms/${n}/rules/${n}`, 'editSchedules', { entity: 'scheduleRule', action: 'scheduleRule.update', id: 2 }),
   route('DELETE', `/platforms/${n}/rules/${n}`, 'editSchedules', { entity: 'scheduleRule', action: 'scheduleRule.delete', id: 2 }),
-  // Rule changes and resume (routes/platforms.js): previewing a rule change saves nothing; the
-  // resume with a choice per missed post writes its own audit entries
+  // Previewing a rule change (routes/platforms.js) saves nothing
   route('POST', `/platforms/${n}/rules/impact`, 'editSchedules'),
-  route('POST', `/platforms/${n}/resume`, 'editPlatforms'),
 
   // Re-uploading an image that is in Recently deleted brings it back for super admins only (routes/media.js)
   route('POST', '/media', 'uploadMedia', { entity: 'media', action: 'media.upload', id: null }),

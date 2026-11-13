@@ -3,7 +3,7 @@
  * slots with their post, so pages don't need a second request.
  *
  * What lives here: SELECT_POST and SELECT_SLOT (base queries), visible, postTypesOf, rulesOf,
- * cadenceOf, fixedDays, blackoutsFor, colorAnchorsOf, missedPosts, slotViews and inventory.
+ * cadenceOf, fixedDays, blackoutsFor, colorAnchorsOf, slotViews and inventory.
  *
  * When editing:
  *   Rows go straight from SQL to JSON (camelCase columns), so a column added here shows up in
@@ -11,7 +11,6 @@
  */
 import { config } from '../config.js';
 import { COLORS, blackoutOn } from './projection.js';
-import { parseLocalDateTime } from './time.js';
 
 // A post with mediaLink, mediaName, postTypeName and slotId; add WHERE/ORDER BY after it
 export const SELECT_POST = `SELECT post.*, media.link AS mediaLink, media.name AS mediaName,
@@ -146,45 +145,6 @@ export async function colorAnchorsOf(db, platform, { exceptPostId = null } = {})
     ...kept.map((k) => ({ date: k.date, time: k.time, color: k.color, blocksDay: false, slotId: k.id })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || (a.postId ?? 0) - (b.postId ?? 0)
     || (a.slotId ?? 0) - (b.slotId ?? 0));
-}
-
-/**
- * The queued posts whose date passed while the platform was paused (or off), for
- * the resume choices on the Platforms page.
- *
- * Usage:
- *   const missed = await missedPosts(db, platform, clock.now());
- *
- * Takes:
- *   platform - parsed platform ({ id, usesColors })
- *   now      - a Date
- *
- * Returns:
- *   [{ ...SELECT_POST row, missedAt (UTC ISO), canReturnToLibrary }] ordered by missedAt:
- *   - Specific Date posts (kind "fixed") whose fixedAt has passed; missedAt is fixedAt.
- *   - Library posts still in a slot whose time passed (sync.js placePosts keeps them there
- *     while the platform is not scheduling); missedAt is the slot's time.
- *   canReturnToLibrary is false for a Specific Date post whose type is not in the rotation
- *   (Holiday is date-only), has no type, or has no color on a platform that uses colors.
- *
- * When editing:
- *   Only means "missed" while the platform is paused or off: on a scheduling platform sync
- *   already sent the library posts back and failed the Specific Date ones.
- */
-export async function missedPosts(db, platform, now) {
-  const nowIso = now.toISOString();
-  const fixed = (await db.all(`${SELECT_POST} WHERE post.platformId = ? AND post.kind = 'fixed' AND post.status = 'queued'
-                                AND post.fixedAt IS NOT NULL`, [platform.id]))
-    .map((p) => ({ ...p, missedAt: parseLocalDateTime(p.fixedAt, config.timezone)?.toISOString() ?? null }))
-    .filter((p) => p.missedAt && p.missedAt <= nowIso);
-  const library = (await db.all(`${SELECT_POST.replace('slot.id AS slotId', 'slot.id AS slotId, slot.scheduledAt AS missedAt')}
-                                 WHERE post.platformId = ? AND post.kind = 'library' AND post.status = 'queued'
-                                   AND slot.scheduledAt <= ?`, [platform.id, nowIso]));
-  const rotation = new Set((await db.all('SELECT id FROM postType WHERE platformId = ? AND inRotation = 1', [platform.id])).map((t) => t.id));
-  return [...fixed, ...library]
-    .map((p) => ({ ...p, canReturnToLibrary: p.kind === 'library'
-      || (rotation.has(p.postTypeId) && (!platform.usesColors || p.color !== null)) }))
-    .sort((a, b) => a.missedAt.localeCompare(b.missedAt) || a.id - b.id);
 }
 
 /**

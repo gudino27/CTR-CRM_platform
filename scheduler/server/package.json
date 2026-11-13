@@ -16,6 +16,7 @@
     "@googleapis/calendar": "^20.0.0",
     "@googleapis/drive": "^26.0.1",
     "express": "^5.2.1",
+    "google-auth-library": "^11.3.3",
     "mariadb": "^3.5.4",
     "rrule": "^2.8.1",
     "sharp": "^0.35.5"

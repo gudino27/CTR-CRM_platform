@@ -4,7 +4,7 @@
  * scheduled. Blackout days are greyed with their reason.
  *
  * What lives here:
- *   weekdays           column headings, Monday first
+ *   weekdays           column headings, Sunday first
  *   dayLabel           "Thu, Nov 26" for a "YYYY-MM-DD"
  *   useScrollIntoView  scrolls a panel into view when it opens
  *   PostEditor         edit one post's caption, image, alt text and date/time
@@ -28,8 +28,8 @@ import ImageField, { imageOfPost, imageProblem } from "../components/ImageField.
 import { useCurrentUser } from "../currentUser.js";
 import { BlackoutNotice, blackoutOn } from "../components/BlackoutDates.jsx";
 import { SuggestedColorNote, useSuggestedColor } from "../components/SuggestedColor.jsx"; // color suggestion
-// Monday first; monthCells uses the same order
-const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// Sunday first, as on US calendars; monthCells uses the same order
+const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * Short day label for a date in the app zone.
@@ -396,20 +396,20 @@ function LockIcon() {
  * The cells of one month's grid.
  *
  * Usage:
- *   monthCells("2026-11")  // [null, null, null, null, null, "2026-11-01", ..., "2026-11-30"]
+ *   monthCells("2026-12")  // [null, null, "2026-12-01", ..., "2026-12-31"]   (Dec 1, 2026 is a Tuesday)
  *
  * Takes:
  *   month - "YYYY-MM"
  *
  * Returns:
- *   Leading nulls up to the first day's weekday (Monday first), then "YYYY-MM-DD" for
+ *   Leading nulls up to the first day's weekday (Sunday first), then "YYYY-MM-DD" for
  *   every day of the month. Worked out in UTC so the viewer's zone cannot shift a day.
  */
 function monthCells(month) {
   const [year, m] = month.split("-").map(Number);
   const firstWeekday = new Date(Date.UTC(year, m - 1, 1)).getUTCDay();
   const totalDays = new Date(Date.UTC(year, m, 0)).getUTCDate();
-  const blanks = Array.from({ length: (firstWeekday + 6) % 7 }, () => null);
+  const blanks = Array.from({ length: firstWeekday }, () => null);
   const days = Array.from({ length: totalDays }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
   return [...blanks, ...days];
 }
@@ -422,15 +422,14 @@ function monthCells(month) {
  *
  * Takes:
  *   cells - the month's grid cells from monthCells (leading nulls, then "YYYY-MM-DD")
- *   index - the cell index of the row's first (Monday) cell
+ *   index - the cell index of the row's first (Sunday) cell
  *
  * Returns:
- *   A span with the week number of the row's Monday (weekOfYear in time.js: Sunday-start weeks,
- *   week 1 contains January 1). Monday to Saturday of a row share that week; the row's Sunday
- *   already starts the next one, because the grid is Monday first.
+ *   A span with the week number of the row's Sunday (weekOfYear in time.js: Sunday-start weeks,
+ *   week 1 contains January 1). The grid is Sunday first, so every day of a row shares that week.
  *
  * How it works:
- *   Finds the first real date in the row and steps back to its Monday (the first row of a month
+ *   Finds the first real date in the row and steps back to its Sunday (the first row of a month
  *   can start with blank cells), in UTC so the viewer's zone cannot shift the day.
  *
  * When editing:
@@ -440,8 +439,8 @@ function WeekNumber({ cells, index }) {
   const offset = cells.slice(index, index + 7).findIndex(Boolean);
   if (offset < 0) return null;
   const [year, m, d] = cells[index + offset].split("-").map(Number);
-  const monday = new Date(Date.UTC(year, m - 1, d - offset)).toISOString().slice(0, 10);
-  const week = weekOfYear(monday);
+  const sunday = new Date(Date.UTC(year, m - 1, d - offset)).toISOString().slice(0, 10);
+  const week = weekOfYear(sunday);
   return (
     <span className="month-week-number" title={`Week ${week} of the year`}>
       Wk {week}
@@ -829,13 +828,6 @@ export default function Calendar() {
         </h2>
       )}
 
-      {platform?.paused && (
-        <p className="sign-in-temporary" role="note">
-          Posting is paused for {platform.name}. Slots keep their posts, but nothing is scheduled or sent and the
-          Google Calendar events are removed until it is resumed on the Platforms page.
-        </p>
-      )}
-
       {message && <p className="error-text">{message}</p>}
       {notice && <p className="success-text" role="status">{notice}</p>}
 
@@ -1056,7 +1048,7 @@ export default function Calendar() {
               {!canEditPosts ? (
                 <>
                   <p className="library-caption">{selected.slot.post.caption}</p>
-                  {askToEdit && <p className="field-hint">Ask a super admin to change a scheduled post.</p>}
+                  {askToEdit && <p className="field-hint">Ask a super admin or a manager to change a scheduled post.</p>}
                 </>
               ) : selected.slot.post.status === "queued" ? (
                 <PostEditor
@@ -1083,7 +1075,7 @@ export default function Calendar() {
           {!canEditPosts ? (
             <>
               <p className="library-caption">{openFixed.caption}</p>
-              {askToEdit && <p className="field-hint">Ask a super admin to change a scheduled post.</p>}
+              {askToEdit && <p className="field-hint">Ask a super admin or a manager to change a scheduled post.</p>}
             </>
           ) : openFixed.status === "queued" ? (
             <PostEditor

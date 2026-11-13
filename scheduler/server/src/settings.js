@@ -24,6 +24,7 @@
  *   autoArchiveCheckMs       how often automatic archiving runs (only if switched on)
  *   webhookTimeoutMs         how long the dispatcher waits for n8n
  *   setupCode*               the setup account's one-time sign-in code
+ *   googleSignIn*            how many failed Google sign-ins one address may make
  *   archiveOlderThanChoices  the "Older than" choices of the Archive page
  *   archiveDefaultOlderThan  which of those is picked by default
  *   notificationCaptionChars how much of a caption a notification quotes
@@ -411,3 +412,43 @@ export const archiveDefaultOlderThan = 12;
  *   Notifications page.
  */
 export const notificationCaptionChars = 60;
+
+/**
+ * The limit on failed "Sign in with Google" attempts (see services/auth.js). A failure is a
+ * token Google does not confirm, or an account that may not sign in (not on the user list,
+ * deactivated, outside the Workspace domain, unverified email).
+ *
+ * Usage:
+ *   googleSignIn(db, credential, req.ip)   (services/auth.js reads both values)
+ *
+ * Takes:
+ *   googleSignInTries    - failed sign-ins allowed from one address per window, 10 by default
+ *   googleSignInWindowMs - that window in milliseconds, 15 * 60_000 = 15 minutes
+ *
+ * When editing:
+ *   The app does not trust X-Forwarded-For, so behind a proxy or tunnel everyone shares one
+ *   address and one limit: a low number lets a few wrong accounts lock everyone out of Google
+ *   sign-in for the window. The "Too many failed Google sign-ins" message is built from
+ *   googleSignInWindowMs. After changing: sign in with a Google account that is not on the
+ *   Users page that many times and check the next try says to wait.
+ */
+export const googleSignInTries = 10;
+export const googleSignInWindowMs = 15 * 60_000;
+
+/**
+ * How long a sent post may wait for n8n's "posted" confirmation before the app raises a
+ * "Not confirmed" notification and lists it on the Library page. Only used when
+ * N8N_CONFIRMS_POSTS=true (.env); otherwise every accepted send counts as confirmed.
+ *
+ * Usage:
+ *   notifyUnconfirmed(db)   (services/notifications.js, after each dispatcher tick)
+ *
+ * Takes:
+ *   Minutes, counted from when the post was sent. 60 by default.
+ *
+ * When editing:
+ *   Too short raises alarms for posts n8n is still publishing. After changing: with
+ *   N8N_CONFIRMS_POSTS=true, let a post send without a callback and check the notification
+ *   and the Library's "Not confirmed" list appear after this many minutes.
+ */
+export const confirmWaitMinutes = 60;

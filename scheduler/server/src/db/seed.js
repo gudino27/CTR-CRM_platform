@@ -10,6 +10,8 @@
  *   linkedInPattern   one-time switch 
  *   startingSchedules one-time switch
  *                     databases whose schedule nobody has changed yet
+ *   linkedInAlternatingWeeks  one-time switch of LinkedIn to Mon/Wed/Fri and Tue/Thu weeks in turn
+ *   alternatingSequences      splits one post type order over rules that take turns by week
  */
 import { openDb } from './index.js';
 import { syncPlatform } from '../services/sync.js';
@@ -49,7 +51,8 @@ const platforms = [
  *   5. Platforms added after migration 004 get their first schedule the same way migrated ones
  *      did: one weekly rule per posting time, cycling the rotation types (or the platform's own
  *      type sequence, like LinkedIn's, when it has one).
- *   6. linkedInPattern, then startingSchedules.
+ *   6. linkedInPattern, then startingSchedules, then linkedInAlternatingWeeks. A new database
+ *      gets LinkedIn's alternating weeks the same way an existing one does.
  *
  * When editing:
  *   Changing the platforms list only affects new databases (or platforms not there yet); an
@@ -103,6 +106,7 @@ export async function seed(db) {
 
   await linkedInPattern(db);
   await startingSchedules(db);
+  await linkedInAlternatingWeeks(db);
 }
 
 /**
@@ -323,6 +327,148 @@ async function startingSchedules(db) {
   for (const id of result) await syncPlatform(db, id, { regenerate: true });
   await db.run('DELETE FROM appSetting WHERE "key" = ?', [STARTING_SCHEDULES_FLAG]);
   await db.run("INSERT INTO appSetting (\"key\", value) VALUES (?, 'done')", [STARTING_SCHEDULES_FLAG]);
+}
+
+const LINKEDIN_WEEKS_FLAG = 'linkedinAlternatingWeeks';
+// LinkedIn's alternating weeks: the first week (a Sunday) posts on the first set of days, the
+// next week on the second, and so on, all at the same time. The weekly rule from before posts
+// up to the day before firstWeek.
+const LINKEDIN_WEEKS = {
+  firstWeek: '2026-11-15',
+  time: '12:00',
+  weeks: [{ byDay: 'MO,WE,FR', label: 'Mon/Wed/Fri weeks' }, { byDay: 'TU,TH', label: 'Tue/Thu weeks' }],
+  from: { byDay: 'TU,TH', time: '12:00' },
+};
+const DAY_MS = 86_400_000;
+const dayOf = (date) => Date.UTC(...date.split('-').map((n, i) => Number(n) - (i === 1 ? 1 : 0))) / DAY_MS;
+const dateOf = (day) => new Date(day * DAY_MS).toISOString().slice(0, 10);
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+/**
+ * Splits one post type order over rules that take turns by week, so that read across all their
+ * posts in date order the types follow that one order.
+ *
+ * Usage:
+ *   alternatingSequences([n, a, n, t], [3, 2])
+ *   // [[n,a,n, a,n,t, n,t,n, t,n,a], [t,n, n,a, a,n, n,t]]
+ *
+ * Takes:
+ *   sequence - the post type ids in order, cycled
+ *   perWeek  - how many posts each rule makes in its week, in the order the weeks come
+ *              ([3, 2]: Mon/Wed/Fri then Tue/Thu)
+ *
+ * Returns:
+ *   One list of post type ids per rule, for that rule's postTypeIds.
+ *
+ * How it works:
+ *   Each rule cycles only its own list (projection.js monthBlueprint), counting its own posts.
+ *   One round of all the weeks makes sum(perWeek) posts; after enough rounds that the order
+ *   comes back to its start, every rule's posts have repeated too. So each list is that rule's
+ *   share of the combined order over those rounds (12 and 8 entries for [3, 2] and 4 types).
+ *
+ * When editing:
+ *   This only holds while every rule makes all its posts each round. A slot type change on one
+ *   rule (the slot panel) or a type taken out of the rotation changes that rule's list only.
+ */
+export function alternatingSequences(sequence, perWeek) {
+  const round = perWeek.reduce((a, b) => a + b, 0);
+  const rounds = sequence.length / gcd(round, sequence.length);
+  return perWeek.map((count, w) => {
+    const before = perWeek.slice(0, w).reduce((a, b) => a + b, 0);
+    const ids = [];
+    for (let r = 0; r < rounds; r++) {
+      for (let j = 0; j < count; j++) ids.push(sequence[(r * round + before + j) % sequence.length]);
+    }
+    return ids;
+  });
+}
+
+/**
+ * LinkedIn moves once from Tue/Thu every week to Mon/Wed/Fri and Tue/Thu weeks in turn, at
+ * 12:00 PM New York time, keeping its post type order running across all its posts. New and
+ * existing databases both get it here, and only when LinkedIn's schedule is still the seeded one.
+ *
+ * Usage:
+ *   await linkedInAlternatingWeeks(db);   (end of seed)
+ *
+ * How it works:
+ *   1. Stops when the appSetting flag (LINKEDIN_WEEKS_FLAG) is "done", and waits (no change,
+ *      tried on the next start) until linkedInPattern has set the LinkedIn order.
+ *   2. In one transaction, unless the flag is "pending" (a retry):
+ *      - LinkedIn's schedule must be exactly one active rule equal to the seeded one (TU,TH 12:00
+ *        weekly from 2026-01-01, no end; plainRule). Anything else: logged as skipped because
+ *        someone already changed it, and the flag is set to "done".
+ *      - The old rule ends the day before LINKEDIN_WEEKS.firstWeek, so its posts before then
+ *        stay where they are.
+ *      - Two every-other-week rules are added: Mon/Wed/Fri from firstWeek, Tue/Thu from a week
+ *        later. Their postTypeIds come from alternatingSequences over the order the old rule
+ *        cycles (its postTypeIds, or the rotation when empty: the LinkedIn order once
+ *        linkedInPattern has run), starting where the old rule would have gone on after its
+ *        posts up to the end date.
+ *      - The flag is set to "pending" when LinkedIn has slots to regenerate, else "done".
+ *   3. Regenerates LinkedIn's future unlocked slots, as after a rule change on the Platforms
+ *      page; past, locked and pinned slots stay. Then sets the flag to "done".
+ *
+ * When editing:
+ *   The rule model has no shared sequence between rules: each rule cycles its own postTypeIds,
+ *   so the combined order lives in the two lists (see alternatingSequences). The old rule's
+ *   place in the order is counted from its days only; slot type changes on it are not counted.
+ *   Every query must run on both SQLite and MariaDB ("key" is quoted, reserved in MariaDB).
+ */
+async function linkedInAlternatingWeeks(db) {
+  const flag = await db.get('SELECT value FROM appSetting WHERE "key" = ?', [LINKEDIN_WEEKS_FLAG]);
+  if (flag?.value === 'done') return;
+  // The LinkedIn order is set first (linkedInPattern logs why when it can't be yet)
+  const pattern = await db.get('SELECT value FROM appSetting WHERE "key" = ?', [LINKEDIN_PATTERN_FLAG]);
+  if (pattern?.value !== 'done') return;
+  const setFlag = async (tx, value) => {
+    await tx.run('DELETE FROM appSetting WHERE "key" = ?', [LINKEDIN_WEEKS_FLAG]);
+    await tx.run('INSERT INTO appSetting ("key", value) VALUES (?, ?)', [LINKEDIN_WEEKS_FLAG, value]);
+  };
+
+  const platformRow = await db.get('SELECT id FROM platform WHERE "key" = ?', ['linkedin']);
+  if (!platformRow) return;
+  const regenerate = flag?.value === 'pending' || await db.transaction(async (tx) => {
+    const rule = await plainRule(tx, platformRow.id, LINKEDIN_WEEKS.from);
+    if (!rule) {
+      console.log("LinkedIn's alternating weeks not applied: someone already changed its schedule rules.");
+      await setFlag(tx, 'done');
+      return false;
+    }
+    // The order the old rule cycles: its own postTypeIds, or the rotation when it has none
+    const rotation = (await tx.all('SELECT id FROM postType WHERE platformId = ? AND inRotation = 1 ORDER BY sortOrder, id',
+      [platformRow.id])).map((t) => t.id);
+    const stored = typeof rule.postTypeIds === 'string' ? JSON.parse(rule.postTypeIds) : rule.postTypeIds ?? [];
+    const own = stored.filter((id) => rotation.includes(id));
+    const sequence = own.length ? own : rotation;
+    if (!sequence.length) return false;
+
+    // Where the old rule would have gone on in that order, after its last post before firstWeek
+    const first = dayOf(LINKEDIN_WEEKS.firstWeek);
+    const oldDays = new Set(rule.byDay.split(',').map((code) => ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(code)));
+    let posted = 0;
+    for (let day = dayOf(rule.startDate); day < first; day++) if (oldDays.has((day + 4) % 7)) posted++;
+    const start = posted % sequence.length;
+    const order = [...sequence.slice(start), ...sequence.slice(0, start)];
+
+    const perWeek = LINKEDIN_WEEKS.weeks.map((w) => w.byDay.split(',').length);
+    const lists = alternatingSequences(order, perWeek);
+    await tx.run('UPDATE scheduleRule SET endDate = ? WHERE id = ?', [dateOf(first - 1), rule.id]);
+    for (const [i, week] of LINKEDIN_WEEKS.weeks.entries()) {
+      await tx.run(`INSERT INTO scheduleRule (platformId, label, byDay, intervalWeeks, time, startDate, postTypeIds, sortOrder)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [platformRow.id, week.label, week.byDay, LINKEDIN_WEEKS.weeks.length, LINKEDIN_WEEKS.time, dateOf(first + 7 * i),
+        JSON.stringify(lists[i]), Number(rule.sortOrder) + 1 + i]);
+    }
+    const hasSlots = Boolean(await tx.get('SELECT 1 FROM slot WHERE platformId = ?', [platformRow.id]));
+    await setFlag(tx, hasSlots ? 'pending' : 'done');
+    if (hasSlots) console.log("LinkedIn's alternating weeks applied: Mon/Wed/Fri and Tue/Thu weeks in turn from "
+      + `${LINKEDIN_WEEKS.firstWeek}.`);
+    return hasSlots;
+  });
+  if (!regenerate) return;
+  await syncPlatform(db, platformRow.id, { regenerate: true });
+  await setFlag(db, 'done');
 }
 
 // Run directly (npm run seed): seed the configured database and list the platforms

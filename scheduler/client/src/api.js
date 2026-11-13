@@ -137,7 +137,7 @@ api.deleteRule = (platformId, ruleId) => request(`/platforms/${platformId}/rules
 // The session is an HttpOnly cookie, which same-origin fetch sends on its own.
 api.me = () => request('/auth/me');
 api.signInOptions = () => request('/auth/options');
-// TEMPORARY test-mode sign-in: { userId }. The real sign-in will send its own proof (e.g. a Google ID token).
+// { googleCredential } (a Google ID token), { setupCode }, or in test mode only { userId }
 api.signIn = (body) => request('/auth/sign-in', { method: 'POST', body });
 api.signOut = () => request('/auth/sign-out', { method: 'POST' });
 api.users = () => request('/users');
@@ -196,12 +196,15 @@ api.changeSlotType = (id, scope, postTypeId) => request(`/slots/${id}/type-chang
 // keeps Blue/Purple alternating for a Specific Date post (null on platforms without colors).
 // ruleImpact(platformId, { ruleId?, rule?, remove? }) -> { onCalendar, moving, until, posts } before
 // a rule change; saving with keepPosts: true (deleteRule(..., true)) keeps those posts where they are.
-// missedPosts(platformId) lists what passed while paused; resumePlatform applies one choice per post:
-// [{ postId, action: "library" | "date" | "skip", fixedAt? }].
 api.suggestColor = (platformId, at, exceptPostId) =>
   request(`/platforms/${platformId}/suggest-color${query({ at, exceptPostId })}`);
 api.ruleImpact = (platformId, change) => request(`/platforms/${platformId}/rules/impact`, { method: 'POST', body: change });
 api.deleteRuleKeepingPosts = (platformId, ruleId) =>
   request(`/platforms/${platformId}/rules/${ruleId}?keepPosts=true`, { method: 'DELETE' });
-api.missedPosts = (platformId) => request(`/platforms/${platformId}/missed`);
-api.resumePlatform = (platformId, choices) => request(`/platforms/${platformId}/resume`, { method: 'POST', body: { choices } });
+
+// ---- Sent but not confirmed ----
+// With N8N_CONFIRMS_POSTS=true on the server, a sent post stays unconfirmed until n8n's callback.
+// unconfirmedPosts() lists posted posts with confirmedAt null; confirmPost ("Mark as published",
+// editPosts) sets confirmedAt. Such a post can also be requeued with requeuePost, like a failed one.
+api.unconfirmedPosts = () => request(`/posts${query({ status: 'posted', confirmed: 'false' })}`);
+api.confirmPost = (id) => request(`/posts/${id}/confirm`, { method: 'POST' });

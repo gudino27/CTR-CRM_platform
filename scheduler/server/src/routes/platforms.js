@@ -9,9 +9,8 @@
  * any signed-in user; PATCH /:id editPlatforms; post types managePostTypes; rules editSchedules.
  * The Test platform only exists in test mode: outside it, its routes answer 404.
  *
- *  the color suggestion for Specific Date posts, the
- * "Move posts / Keep posts" choice when the rules change (keepPosts and rules/impact), and
- * resuming a paused platform with a choice per missed post (missed and resume).
+ * Also here: the color suggestion for Specific Date posts and the "Move posts / Keep posts"
+ * choice when the rules change (keepPosts and rules/impact).
  */
 import { Router } from 'express';
 import { config } from '../config.js';
@@ -19,7 +18,7 @@ import { clock } from '../services/clock.js';
 import { RULE_DAYS } from '../services/projection.js';
 import { localDateString, parseDateString, parseLocalDateTime } from '../services/time.js';
 import { parsePlatform, ruleChangeImpact, suggestColor, syncPlatform } from '../services/sync.js';
-import { cadenceOf, missedPosts, postTypesOf, rulesOf } from '../services/views.js';
+import { cadenceOf, postTypesOf, rulesOf } from '../services/views.js';
 import { writeAudit } from '../services/access.js';
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -36,7 +35,7 @@ const MAX_SEQUENCE = 50;
  *
  * Takes:
  *   body - any of calendarColorId ("1" to "11" or null), charLimit (a positive integer or null),
- *          webhookUrl (an http(s) URL or null), paused, enabled (true/false)
+ *          webhookUrl (an http(s) URL or null), enabled (true/false)
  *
  * Returns:
  *   [column, value] pairs for the fields present. Throws a message (a 400) for a bad value, or
@@ -62,11 +61,9 @@ function platformUpdates(body) {
     if (url !== null && !(typeof url === 'string' && /^https?:\/\/\S+$/.test(url))) throw 'webhookUrl must be an http(s) URL or null';
     updates.push(['webhookUrl', url]);
   }
-  for (const flag of ['paused', 'enabled']) {
-    if (flag in body) {
-      if (typeof body[flag] !== 'boolean') throw `${flag} must be true or false`;
-      updates.push([flag, body[flag] ? 1 : 0]);
-    }
+  if ('enabled' in body) {
+    if (typeof body.enabled !== 'boolean') throw 'enabled must be true or false';
+    updates.push(['enabled', body.enabled ? 1 : 0]);
   }
   return updates;
 }
@@ -192,11 +189,11 @@ export function platformsRouter(db) {
   });
 
   /**
-   * PATCH /api/platforms/:id: color, character limit, webhook, and pause/enable; the cadence
-   * lives in the schedule rules below. Needs editPlatforms.
+   * PATCH /api/platforms/:id: color, character limit, webhook, and on/off (enabled); the
+   * cadence lives in the schedule rules below. Needs editPlatforms.
    *
    * Usage:
-   *   PATCH /api/platforms/2  { paused: true }
+   *   PATCH /api/platforms/2  { calendarColorId: "5" }
    *
    * Takes:
    *   body - see platformUpdates
@@ -205,10 +202,12 @@ export function platformsRouter(db) {
    *   200 with view(row); 404 unknown; 400 with a message for a bad value.
    *
    * How it works:
-   *   Saves, then syncPlatform. Pausing keeps the slots and which post is in each, but takes every
-   *   queued post's time and calendar event away so nothing sends (see syncPlatformNow); resuming
-   *   puts them back. Library posts whose slot passed meanwhile refill later slots; Specific Date
-   *   posts whose time passed are marked failed so a person can requeue them with a new date.
+   *   Saves, then syncPlatform. Turning a platform off keeps the slots and which post is in each,
+   *   but takes every queued post's time and calendar event away so nothing sends (see
+   *   syncPlatformNow); turning it back on puts them back. Library posts whose slot passed
+   *   meanwhile refill later slots; Specific Date posts whose time passed are marked failed so a
+   *   person can requeue them with a new date. The platform.paused column is no longer used: a
+   *   paused field in the body is ignored.
    */
   router.patch('/:id', async (req, res) => {
     const row = await byId(req.params.id);
@@ -380,7 +379,7 @@ export function platformsRouter(db) {
    *
    * Returns:
    *   200 with view(row); 404 unknown rule; 400 with a message for a bad field, or turning off the
-   *   last active rule (pause the platform to stop posting instead).
+   *   last active rule.
    */
   router.patch('/:id/rules/:ruleId', async (req, res) => {
     const row = await byId(req.params.id);
@@ -394,7 +393,7 @@ export function platformsRouter(db) {
       return res.status(400).json({ error: message });
     }
     if (body.active === false && rule.active && (await activeRuleCount(row.id)) <= 1) {
-      return res.status(400).json({ error: `${row.name} needs at least one active schedule rule; pause the platform to stop posting` });
+      return res.status(400).json({ error: `${row.name} needs at least one active schedule rule` });
     }
     if (updates.length > 0) {
       if (body.keepPosts === true) await keepPosts(req, row, await proposedRules(row.id, { ruleId: rule.id, updates }));
@@ -413,8 +412,7 @@ export function platformsRouter(db) {
    *   DELETE /api/platforms/2/rules/7?keepPosts=true   (posts on the calendar stay)
    *
    * Returns:
-   *   200 with view(row); 404 unknown rule; 400 for the last active rule (pause the platform to
-   *   stop posting instead).
+   *   200 with view(row); 404 unknown rule; 400 for the last active rule.
    *
    * How it works:
    *   Deletes the row and regenerates the future unlocked slots; posts in slots that go away
@@ -426,7 +424,7 @@ export function platformsRouter(db) {
     if (!rule) return res.status(404).json({ error: 'Schedule rule not found' });
     // A platform always keeps one active rule
     if (rule.active && (await activeRuleCount(row.id)) <= 1) {
-      return res.status(400).json({ error: `${row.name} needs at least one active schedule rule, so its last one cannot be deleted; pause the platform to stop posting` });
+      return res.status(400).json({ error: `${row.name} needs at least one active schedule rule, so its last one cannot be deleted` });
     }
     if (req.query.keepPosts === 'true') await keepPosts(req, row, await proposedRules(row.id, { ruleId: rule.id, remove: true }));
     await db.run('DELETE FROM scheduleRule WHERE id = ?', [rule.id]);
@@ -434,7 +432,7 @@ export function platformsRouter(db) {
     res.json(await view(await byId(row.id)));
   });
 
-  // ---- color suggestion, keep-or-move on rule changes, resume choices ----
+  // ---- color suggestion, keep-or-move on rule changes ----
 
   /**
    * The platform's schedule rules as they would be after a change, for
@@ -549,117 +547,5 @@ export function platformsRouter(db) {
     res.json(await suggestColor(db, parsePlatform(row), req.query.at, { exceptPostId }));
   });
 
-  /**
-   * GET /api/platforms/:id/missed: the queued posts whose date passed while the platform was
-   * paused, for the resume choices. Any signed-in user.
-   *
-   * Usage:
-   *   GET /api/platforms/2/missed
-   *
-   * Returns:
-   *   200 [missedPosts row] ([] when the platform is not paused); 404 unknown platform.
-   */
-  router.get('/:id/missed', async (req, res) => {
-    const row = await byId(req.params.id);
-    if (!usable(row)) return res.status(404).json({ error: 'Platform not found' });
-    res.json(row.paused ? await missedPosts(db, parsePlatform(row), clock.now()) : []);
-  });
-
-  /**
-   * POST /api/platforms/:id/resume: resumes a paused platform and applies a choice per missed
-   * post, in one request. Needs editPlatforms.
-   *
-   * Usage:
-   *   POST /api/platforms/2/resume  { choices: [
-   *     { postId: 12, action: "library" },
-   *     { postId: 13, action: "date", fixedAt: "2026-11-30T10:00" },
-   *     { postId: 14, action: "skip" } ] }
-   *
-   * Takes:
-   *   body.choices - optional list; each postId must be one of GET /missed's posts:
-   *     "library" - back to the library (a Specific Date post becomes a library post); not for a
-   *                 post with canReturnToLibrary false (Holiday is date-only)
-   *     "date"    - a new date and time (a future local "YYYY-MM-DDTHH:MM", New York time); a
-   *                 library post becomes a Specific Date post
-   *     "skip"    - marked failed with the reason "Skipped after pause" (it stays in the
-   *                 Library's failed list, where it can be requeued)
-   *   Posts without a choice get today's default: a library post goes back to the library and
-   *   fills its next matching slot; a Specific Date post is marked failed ("pick a new date").
-   *
-   * Returns:
-   *   200 with view(row); 404 unknown platform; 409 when it is not paused; 400 with a message for
-   *   a bad choice (then nothing is changed).
-   *
-   * How it works:
-   *   1. Checks every choice first.
-   *   2. In one transaction: applies the choices, then sets paused = 0.
-   *   3. syncPlatform puts everything back on the schedule and calendar (and applies the
-   *      defaults to the posts without a choice).
-   *   4. Writes one audit entry for the resume and one per choice.
-   *
-   * When editing:
-   *   The choices must be saved before the sync runs unpaused, or sync would apply the
-   *   defaults first. ROUTES has no entity/action for this route because the audit entries
-   *   are written here. A new date is not checked against the 2-hour window or blackouts.
-   */
-  router.post('/:id/resume', async (req, res) => {
-    const row = await byId(req.params.id);
-    if (!usable(row)) return res.status(404).json({ error: 'Platform not found' });
-    if (!row.paused) return res.status(409).json({ error: `${row.name} is not paused` });
-    const choices = req.body?.choices ?? [];
-    if (!Array.isArray(choices)) return res.status(400).json({ error: 'choices must be a list' });
-    const missed = new Map((await missedPosts(db, parsePlatform(row), clock.now())).map((p) => [p.id, p]));
-    const seen = new Set();
-    for (const choice of choices) {
-      const post = missed.get(choice?.postId);
-      if (!post) return res.status(400).json({ error: `Post ${choice?.postId} is not one of ${row.name}'s missed posts` });
-      if (seen.has(post.id)) return res.status(400).json({ error: `Post ${post.id} has more than one choice` });
-      seen.add(post.id);
-      if (!['library', 'date', 'skip'].includes(choice.action)) {
-        return res.status(400).json({ error: 'action must be "library", "date" or "skip"' });
-      }
-      if (choice.action === 'library' && !post.canReturnToLibrary) {
-        return res.status(400).json({ error: `Post ${post.id} (${post.postTypeName ?? 'no type'}) can only go out on a date; pick a new date or skip it` });
-      }
-      if (choice.action === 'date') {
-        const at = parseLocalDateTime(choice.fixedAt, config.timezone);
-        if (!at) return res.status(400).json({ error: 'fixedAt must be a local date and time, "YYYY-MM-DDTHH:MM"' });
-        if (at <= clock.now()) return res.status(400).json({ error: `${choice.fixedAt.replace('T', ' ')} has already passed` });
-      }
-    }
-    const said = [];
-    await db.transaction(async (tx) => {
-      const freeSlot = (postId) => tx.run('UPDATE slot SET postId = NULL, pinned = 0 WHERE postId = ?', [postId]);
-      for (const choice of choices) {
-        const post = missed.get(choice.postId);
-        if (choice.action === 'library') {
-          await freeSlot(post.id);
-          await tx.run(`UPDATE post SET kind = 'library', fixedAt = NULL, scheduledAt = NULL, updatedAt = datetime('now') WHERE id = ?`, [post.id]);
-          said.push([post, 'back to the library']);
-        } else if (choice.action === 'date') {
-          await freeSlot(post.id);
-          await tx.run(`UPDATE post SET kind = 'fixed', fixedAt = ?, scheduledAt = NULL, updatedAt = datetime('now') WHERE id = ?`,
-            [choice.fixedAt, post.id]);
-          said.push([post, `moved to ${choice.fixedAt.replace('T', ' ')}`]);
-        } else {
-          // Skipped posts stay in their passed slot as history, like other failed posts
-          await tx.run(`UPDATE post SET status = 'failed', lastError = 'Skipped after pause', scheduledAt = NULL,
-                          updatedAt = datetime('now') WHERE id = ?`, [post.id]);
-          said.push([post, 'skipped (marked failed: "Skipped after pause")']);
-        }
-      }
-      // Last, after the choices: an unpaused sync would apply the defaults to them
-      await tx.run('UPDATE platform SET paused = 0 WHERE id = ?', [row.id]);
-    });
-    await syncPlatform(db, row.id);
-    const userId = req.user?.id ?? null;
-    await writeAudit(db, { userId, action: 'platform.resume', entityType: 'platform', entityId: row.id,
-      summary: `Resumed ${row.name}; ${missed.size} missed post${missed.size === 1 ? '' : 's'}, ${choices.length} with a choice` });
-    for (const [post, what] of said) {
-      await writeAudit(db, { userId, action: 'post.resumeChoice', entityType: 'post', entityId: post.id,
-        summary: `Missed while ${row.name} was paused: ${what}` });
-    }
-    res.json(await view(await byId(row.id)));
-  });
   return router;
 }

@@ -10,20 +10,24 @@
  *   postFailed       a post failed to send (dispatcher or n8n), or calendar sync needs a
  *                    new date for it; one per failure, closed when the post is requeued
  *   daySkipped       a deleted calendar event made the app skip that day (calendarPull.js)
+ *   notConfirmed     with N8N_CONFIRMS_POSTS=true, a post n8n accepted was never confirmed as
+ *                    published within confirmWaitMinutes (settings.js); closed when it is
+ *                    confirmed (callback or "Mark as published") or requeued
  * Read state is shared by everyone (one readAt per notification), which keeps it simple.
  *
  * What lives here: notify and openNotification (writing and finding rows), notificationView,
- * text helpers (postLabel, dayText, whenText), the failed-post scan (notifyFailures), and the
- * calendar text-edit flow (textHolds, descriptionText, captionFromDescription, checkTextEdit,
+ * text helpers (postLabel, dayText, whenText), the failed-post scan (notifyFailures), the
+ * not-confirmed scan (notifyUnconfirmed, resolveNotConfirmed), and the calendar text-edit flow (textHolds, descriptionText, captionFromDescription, checkTextEdit,
  * resolveTextEdit).
  */
 import { absoluteUrl, config } from '../config.js';
 import { buildEvent } from './googleCalendar.js';
 import { writeAudit } from './access.js';
-import { notificationCaptionChars } from '../settings.js';
+import { confirmWaitMinutes, notificationCaptionChars } from '../settings.js';
+import { clock } from './clock.js';
 
 // The notification.kind values the app writes
-export const KINDS = ['calendarClash', 'calendarTextEdit', 'postFailed', 'daySkipped'];
+export const KINDS = ['calendarClash', 'calendarTextEdit', 'postFailed', 'daySkipped', 'notConfirmed'];
 
 /**
  * A notification row as the API returns it: data parsed from its JSON text.
@@ -167,7 +171,7 @@ export function notifyFailures(db) {
  *
  * When editing:
  *   That wording check depends on the lastError texts in calendarPull.js (DELETED_REASON and
- *   the moved-into-the-past message) and sync.js (the paused message); keep them matching.
+ *   the moved-into-the-past message) and sync.js (the turned-off message); keep them matching.
  */
 async function scanFailures(db) {
   await db.run(`UPDATE notification SET resolvedAt = datetime('now') WHERE kind = 'postFailed' AND resolvedAt IS NULL
@@ -191,6 +195,81 @@ async function scanFailures(db) {
   }
   return fresh.length;
 }
+
+// ---- Sent but never confirmed ----
+
+// One scan at a time, so two ticks never add the same notification twice
+let scanningUnconfirmed = Promise.resolve();
+
+/**
+ * Adds a notConfirmed notification for every post that was sent but that n8n has not
+ * confirmed as published within confirmWaitMinutes, and closes the open ones that no longer
+ * apply. Only posts sent with N8N_CONFIRMS_POSTS=true can be in that state (dispatch.js).
+ *
+ * Usage:
+ *   await notifyUnconfirmed(db);   // dispatchDue (services/dispatch.js), every scheduler tick
+ *
+ * Returns:
+ *   A promise for the number of notifications added. Rejects on a database error.
+ *
+ * How it works:
+ *   1. Closes open notConfirmed notifications whose post is gone, no longer 'posted'
+ *      (requeued, or n8n reported "failed"), or now has confirmedAt.
+ *   2. Finds posted posts with confirmedAt NULL, sent at least confirmWaitMinutes ago, not
+ *      archived, and without an open notConfirmed notification; adds one each, titled
+ *      "<Platform> post for <day> at <time> was sent but n8n never confirmed it was published."
+ *
+ * When editing:
+ *   sentAt is the app clock's ISO text (dispatch.js), so the cut-off compares as text on both
+ *   SQLite and MariaDB. The Library's "Not confirmed" list uses the same rule
+ *   (GET /api/posts?status=posted&confirmed=false) but without the wait.
+ */
+export function notifyUnconfirmed(db) {
+  const run = scanningUnconfirmed.then(() => scanUnconfirmed(db));
+  scanningUnconfirmed = run.catch(() => {});
+  return run;
+}
+
+/**
+ * The scan itself (notifyUnconfirmed queues it).
+ */
+async function scanUnconfirmed(db) {
+  await db.run(`UPDATE notification SET resolvedAt = datetime('now') WHERE kind = 'notConfirmed' AND resolvedAt IS NULL
+                  AND (postId IS NULL OR NOT EXISTS (SELECT 1 FROM post WHERE post.id = notification.postId
+                    AND post.status = 'posted' AND post.confirmedAt IS NULL))`);
+  const cutoff = new Date(clock.now().getTime() - confirmWaitMinutes * 60_000).toISOString();
+  const late = await db.all(`SELECT post.*, platform.name AS platformName FROM post JOIN platform ON platform.id = post.platformId
+                             WHERE post.status = 'posted' AND post.confirmedAt IS NULL AND post.archivedAt IS NULL
+                               AND post.sentAt IS NOT NULL AND post.sentAt <= ?
+                               AND NOT EXISTS (SELECT 1 FROM notification WHERE notification.postId = post.id
+                                 AND notification.kind = 'notConfirmed' AND notification.resolvedAt IS NULL)
+                             ORDER BY post.id`, [cutoff]);
+  for (const post of late) {
+    const when = new Date(post.scheduledAt ?? post.sentAt);
+    const time = new Intl.DateTimeFormat('en-US', { timeZone: config.timezone, hour: 'numeric', minute: '2-digit' }).format(when);
+    await notify(db, {
+      kind: 'notConfirmed',
+      postId: post.id,
+      platformId: post.platformId,
+      title: `${post.platformName} post for ${dayText(when)} at ${time} was sent but n8n never confirmed it was published.`,
+      body: `${postLabel(post)[0].toUpperCase()}${postLabel(post).slice(1)} was sent to n8n but no confirmation came back. `
+        + `Check ${post.platformName}: if it is there, choose "Mark as published" on the Library page; `
+        + 'if it is not, requeue it there.',
+      data: { sentAt: post.sentAt, kind: post.kind },
+    });
+  }
+  return late.length;
+}
+
+/**
+ * Closes the open notConfirmed notification about a post, right away (the confirm and
+ * requeue routes), instead of waiting for the next scan.
+ *
+ * Usage:
+ *   await resolveNotConfirmed(db, post.id);
+ */
+export const resolveNotConfirmed = (db, postId) =>
+  db.run("UPDATE notification SET resolvedAt = datetime('now') WHERE kind = 'notConfirmed' AND postId = ? AND resolvedAt IS NULL", [postId]);
 
 // ---- Text edited in Google Calendar (3b) ----
 

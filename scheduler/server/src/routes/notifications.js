@@ -134,7 +134,7 @@ export function notificationsRouter(db) {
     }
     // Google's caption changes a post that is on the calendar, i.e. scheduled: that needs editScheduledPosts too
     if (req.body?.choice === 'google' && !(await can(db, req.user, 'editScheduledPosts'))) {
-      return res.status(403).json({ error: 'Ask a super admin to change a scheduled post', permission: 'editScheduledPosts' });
+      return res.status(403).json({ error: 'Ask a super admin or a manager to change a scheduled post', permission: 'editScheduledPosts' });
     }
     try {
       const { notification, platformId } = await resolveTextEdit(db, req.params.id, req.body?.choice, req.user?.id);

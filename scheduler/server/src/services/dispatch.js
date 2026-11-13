@@ -5,13 +5,15 @@
  *
  * What lives here: dispatchDue (run by every scheduler tick), failInterrupted (run once at
  * startup), buildPayload and payloadProblems (the payload contract), webhookUrlFor and
- * testEndpointUrl (where posts go).
+ * testEndpointUrl (where posts go), n8nConfirmsPosts (whether a send waits for n8n's
+ * confirmation).
  */
 import { absoluteUrl, config } from '../config.js';
 import { clock } from './clock.js';
 import { serialized } from './lock.js';
 import { offsetIso } from './time.js';
 import { webhookTimeoutMs } from '../settings.js';
+import { notifyUnconfirmed } from './notifications.js';
 
 const KINDS = ['library', 'fixed'];
 
@@ -128,7 +130,26 @@ export function payloadProblems(p) {
 }
 
 /**
- * Sends every queued post whose slot has come.
+ * Whether n8n confirms each publish through the status callback (env N8N_CONFIRMS_POSTS=true).
+ * When it does, a send n8n accepts is 'posted' but unconfirmed (confirmedAt NULL) until the
+ * callback says "posted"; when it does not (the default), the accepted send counts as
+ * confirmed at once, as before.
+ *
+ * Usage:
+ *   if (n8nConfirmsPosts()) ...
+ *
+ * Returns:
+ *   true only when N8N_CONFIRMS_POSTS is exactly "true".
+ *
+ * When editing:
+ *   Read from process.env on every call, not from config.js, so it can be switched without
+ *   touching the rest of the configuration.
+ */
+export const n8nConfirmsPosts = () => process.env.N8N_CONFIRMS_POSTS === 'true';
+
+/**
+ * Sends every queued post whose slot has come, then raises a notification for any sent post
+ * n8n never confirmed (notifyUnconfirmed in notifications.js).
  *
  * Usage:
  *   await dispatchDue(db);   // the scheduler tick (routes/system.js)
@@ -138,10 +159,12 @@ export function payloadProblems(p) {
  *
  * How it works:
  *   Queues dispatchDueNow behind any running sync or pull (lock.js), so a due post can't be
- *   sent twice.
+ *   sent twice. The confirmation check runs after it, outside that queue.
  */
-export function dispatchDue(db) {
-  return serialized(() => dispatchDueNow(db));
+export async function dispatchDue(db) {
+  const found = await serialized(() => dispatchDueNow(db));
+  await notifyUnconfirmed(db);
+  return found;
 }
 
 /**
@@ -151,12 +174,16 @@ export function dispatchDue(db) {
  *   1. Finds queued posts with scheduledAt at or before now, oldest first.
  *   2. For each, claims it (queued -> sending); a post someone else already claimed is skipped.
  *   3. Builds the payload and picks the URL (webhookUrlFor).
- *   4. DRY_RUN: logs it, records a dispatch row with dryRun 1, marks it posted.
+ *   4. DRY_RUN: logs it, records a dispatch row with dryRun 1, marks it posted (and
+ *      confirmed: nothing was sent, so no confirmation will come).
  *   5. Otherwise POSTs the JSON and waits at most webhookTimeoutMs (settings.js). Calls to the
  *      built-in test endpoint carry X-Self-Call (config.selfCallSecret): the endpoint knows
  *      this process by that secret, so BASIC_AUTH lets it through (app.js).
  *   6. Records a dispatch row (url, payload, HTTP status, error) and marks the post posted
  *      for any 2xx, or failed with the error (no URL, non-2xx, timeout, network error).
+ *      A posted post gets confirmedAt now, unless n8nConfirmsPosts(): then it stays NULL
+ *      until the status callback (or "Mark as published") confirms it. A queued post's
+ *      confirmedAt is always NULL (new, or cleared by requeue), so nothing is written then.
  *
  * When editing:
  *   The claim must come before the send: it is what stops a post going out twice. A failed
@@ -169,6 +196,8 @@ async function dispatchDueNow(db) {
                             ORDER BY scheduledAt`, [now]);
   const claim = (id) => db.run(`UPDATE post SET status = 'sending', updatedAt = datetime('now') WHERE id = ? AND status = 'queued'`, [id]);
   const finish = (...values) => db.run(`UPDATE post SET status = ?, sentAt = ?, lastError = ?, updatedAt = datetime('now') WHERE id = ?`, values);
+  // Keeps a time n8n's callback may already have set while the request was still open
+  const confirm = (id) => db.run('UPDATE post SET confirmedAt = COALESCE(confirmedAt, ?) WHERE id = ?', [now, id]);
   const record = (...values) => db.run(`INSERT INTO dispatch (postId, url, payload, dryRun, httpStatus, error, createdAt)
                                         VALUES (?, ?, ?, ?, ?, ?, ?)`, values);
 
@@ -184,6 +213,7 @@ async function dispatchDueNow(db) {
       console.log(`[dry run] would POST to ${url}:`, JSON.stringify(payload));
       await record(post.id, url, JSON.stringify(payload), 1, null, null, now);
       await finish('posted', now, null, post.id);
+      await confirm(post.id);
       continue;
     }
 
@@ -205,6 +235,8 @@ async function dispatchDueNow(db) {
     }
     await record(post.id, url, JSON.stringify(payload), 0, httpStatus, error, now);
     await finish(error ? 'failed' : 'posted', now, error, post.id);
+    // With confirmations on, confirmedAt stays NULL (requeue clears it) until n8n confirms
+    if (!error && !n8nConfirmsPosts()) await confirm(post.id);
   }
   return due.length;
 }

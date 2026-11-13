@@ -3,10 +3,14 @@
  * the user row is read again on every request, so deactivating someone or changing their
  * role takes effect right away.
  *
- * TEMPORARY until a sign-in method is chosen (Google sign-in is recommended).
- * Until then, test mode offers a "Sign in as" list with no password. Everything that decides
- * *who someone is* lives in identify() and signInOptions() below; replace those two to add
- * the real sign-in. The session cookie, timeouts, roles and permissions stay as they are.
+ * People sign in with Google, using the organization's Google Workspace accounts
+ * (GOOGLE_SIGNIN_CLIENT_ID, GOOGLE_WORKSPACE_DOMAIN; see the README's "Google sign-in setup").
+ * The sign-in page gets a Google ID token from Google Identity Services and sends it here; the
+ * token is verified and its email must belong to an active user on the Users page. Nobody is
+ * ever added by signing in. The setup account has no Google identity and uses the setup code.
+ * Test mode also offers a "Sign in as" list with no password. Everything that decides *who
+ * someone is* lives in identify() and signInOptions() below; the session cookie, timeouts,
+ * roles and permissions do not depend on how someone signed in.
  *
  * Session timeouts follow the OWASP Session Management Cheat Sheet
  * (https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html):
@@ -26,13 +30,16 @@
  *
  * What lives here: session cookies (sessionToken, readSessionToken, startSession,
  * renewSession, clearSessionCookie, revokeSession, readSession, currentUser, sessionTimes),
- * the setup code (makeSetupCode, printSetupCode, startAuth), the temporary sign-in
- * (signInOptions, identify), ensureUsers, userView and sameSecret.
+ * the setup code (makeSetupCode, printSetupCode, startAuth), Google sign-in (googleSignIn,
+ * setGoogleVerifier), what the sign-in screen offers and who someone is (signInOptions,
+ * identify), ensureUsers, userView and sameSecret.
  */
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config.js';
 // The setup code's lifetime, tries, length and letters live in settings.js
 import {
+  googleSignInTries, googleSignInWindowMs,
   setupCodeHours, setupCodeLength, setupCodeLetters, setupCodeTries, setupCodeWindowMs,
 } from '../settings.js';
 
@@ -433,30 +440,159 @@ export async function startAuth(db) {
   if (code && !process.env.NODE_TEST_CONTEXT) printSetupCode(code);
 }
 
-// ---- TEMPORARY sign-in: replace these two functions with the real method ----
+// ---- Google sign-in ----
+//
+// The sign-in page gets an ID token (a "credential") from Google Identity Services and posts it
+// as { googleCredential }. Google signs the token; verifying it proves which Google account
+// signed in. Failed sign-ins are limited per address like wrong setup codes.
 
-const temporarySignIn = () => config.testMode;
+const googleFailures = new Map(); // address -> times (ms) of failed Google sign-ins in the last window
+let googleClient = null;
 
 /**
- * What the sign-in screen shows. The real method would return e.g. { method: 'google', clientId }.
+ * The real token check: google-auth-library verifies the signature against Google's public
+ * keys (fetched from Google and cached), the issuer, the expiry and the audience.
+ *
+ * Takes:
+ *   idToken  - the credential from the sign-in page
+ *   audience - GOOGLE_SIGNIN_CLIENT_ID
+ *
+ * Returns:
+ *   The token's payload ({ email, email_verified, hd, name, ... }). Throws for a bad token.
+ */
+async function verifyWithGoogle(idToken, audience) {
+  googleClient ??= new OAuth2Client();
+  const ticket = await googleClient.verifyIdToken({ idToken, audience });
+  return ticket.getPayload();
+}
+
+let verifyGoogleToken = verifyWithGoogle;
+
+/**
+ * Replaces the Google token check, so tests never call Google, and clears the failed-sign-in
+ * counts.
+ *
+ * Usage:
+ *   setGoogleVerifier(async (idToken, audience) => ({ email: 'a@example.org', email_verified: true }));
+ *   setGoogleVerifier(null);   // back to the real check
+ *
+ * Takes:
+ *   verify - async (idToken, audience) => payload, throwing for a bad token; null for the real one
+ */
+export function setGoogleVerifier(verify) {
+  verifyGoogleToken = verify ?? verifyWithGoogle;
+  googleFailures.clear();
+}
+
+/**
+ * Signs in with a Google ID token.
+ *
+ * Usage:
+ *   const user = await googleSignIn(db, req.body.googleCredential, req.ip);   // via identify
+ *
+ * Takes:
+ *   credential - the ID token from Google Identity Services
+ *   address    - the caller's address (req.ip), for the failed-sign-in limit
+ *   now        - the time in ms
+ *
+ * Returns:
+ *   The active user whose email the token carries. Throws { status, error }:
+ *   501 when GOOGLE_SIGNIN_CLIENT_ID is not set; 429 after googleSignInTries failures from that
+ *   address within googleSignInWindowMs (settings.js); 401 when Google does not confirm the
+ *   token (bad, expired, or made for another client ID); 403 for an unverified email, an
+ *   account outside GOOGLE_WORKSPACE_DOMAIN (when set), or an email that is not an active user.
+ *
+ * How it works:
+ *   1. Checks the address's failure count, then verifies the token (signature, issuer, expiry,
+ *      audience = GOOGLE_SIGNIN_CLIENT_ID).
+ *   2. Requires email_verified, and the token's hd (its Workspace domain) to equal
+ *      GOOGLE_WORKSPACE_DOMAIN when that is set.
+ *   3. Looks the email up among active, non-setup users, ignoring case.
+ *   4. Fills in the user's name from the token only when it is empty. Nothing else from the
+ *      token is stored.
+ *   Every failure from step 1's verify onwards is counted for the address; a success clears it.
+ *
+ * When editing:
+ *   Never create a user here: only people added on the Users page may sign in. Keep the hd
+ *   check: without it any Google account with a matching email address would pass. A
+ *   deactivated user gets the same 403 as an unknown one.
+ */
+export async function googleSignIn(db, credential, address = 'unknown', now = Date.now()) {
+  const { clientId, domain } = config.googleSignIn;
+  if (!clientId) throw { status: 501, error: 'Google sign-in is not set up on this server' };
+  const tries = (googleFailures.get(address) ?? []).filter((t) => now - t < googleSignInWindowMs);
+  if (tries.length >= googleSignInTries) {
+    throw { status: 429, error: `Too many failed Google sign-ins from here. Try again in ${googleSignInWindowMs / 60_000} minutes.` };
+  }
+  const fail = (status, error) => {
+    if (googleFailures.size > 1000) googleFailures.clear(); // keeps the table small; the window is short anyway
+    googleFailures.set(address, [...tries, now]);
+    return { status, error };
+  };
+  let payload;
+  try {
+    payload = typeof credential === 'string' && credential ? await verifyGoogleToken(credential, clientId) : null;
+  } catch {
+    payload = null;
+  }
+  if (!payload?.email) throw fail(401, 'Google could not confirm this sign-in. Try again.');
+  if (payload.email_verified !== true) throw fail(403, 'This Google account\'s email address is not verified.');
+  // Without this check any Google account with a matching address would pass
+  if (domain && String(payload.hd ?? '').toLowerCase() !== domain) {
+    throw fail(403, `Sign in with your ${domain} Google Workspace account.`);
+  }
+  const user = await db.get('SELECT * FROM appUser WHERE LOWER(email) = ? AND active = 1 AND isSetup = 0',
+    [String(payload.email).trim().toLowerCase()]);
+  if (!user) throw fail(403, "This Google account is not on the scheduler's user list. Ask a super admin to add you.");
+  googleFailures.delete(address);
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+  if (name && !String(user.name ?? '').trim()) {
+    await db.run("UPDATE appUser SET name = ?, updatedAt = datetime('now') WHERE id = ?", [name, user.id]);
+    return { ...user, name };
+  }
+  return user;
+}
+
+// ---- What the sign-in screen offers, and who someone is ----
+
+const temporarySignIn = () => config.testMode;
+const googleOption = () => (config.googleSignIn.clientId
+  ? { clientId: config.googleSignIn.clientId, domain: config.googleSignIn.domain }
+  : null);
+
+/**
+ * What the sign-in screen shows.
  *
  * Usage:
  *   res.json(await signInOptions(db));   // GET /api/auth/options
  *
  * Returns:
- *   Outside test mode: { method: 'setupCode', message } while an active setup account exists,
- *   otherwise { method: 'none', message }.
- *   In test mode: { method: 'temporary', message, users: [{ id, name, email, role, isSetup }] },
- *   every active user, highest role first, the setup account after the others of its role.
+ *   Outside test mode, one of:
+ *     { method: 'google', message, clientId, domain, setupCode, codeHours } when
+ *       GOOGLE_SIGNIN_CLIENT_ID is set. setupCode is true while an active setup account
+ *       exists, so the setup code form shows under the Google button. domain is
+ *       GOOGLE_WORKSPACE_DOMAIN or null.
+ *     { method: 'setupCode', message, codeHours } without Google sign-in, while an active
+ *       setup account exists.
+ *     { method: 'none', message } otherwise.
+ *   In test mode: { method: 'temporary', message, users: [{ id, name, email, role, isSetup }],
+ *   google: { clientId, domain } or null }: every active user, highest role first, the setup
+ *   account after the others of its role; google is set when GOOGLE_SIGNIN_CLIENT_ID is, so
+ *   the Google button can be tried locally too.
  *
  * When editing:
- *   TEMPORARY: replace this with the real sign-in method (see the file header), together
- *   with identify().
+ *   client/src/pages/SignIn.jsx reads these shapes. The client ID is public (it is in the
+ *   page anyway); never send the OAuth client secret.
  */
 export async function signInOptions(db) {
   if (!temporarySignIn()) {
-    // Until the real method exists: the setup code from the server log
-    if (await activeSetupAccount(db)) {
+    const google = googleOption();
+    const setup = Boolean(await activeSetupAccount(db));
+    if (google) {
+      return { method: 'google', message: 'Sign in with your Google Workspace account.', ...google,
+        setupCode: setup, codeHours: setupCodeHours };
+    }
+    if (setup) {
       return { method: 'setupCode', message: 'Sign in with the setup code printed in the server log at startup.', codeHours: setupCodeHours };
     }
     return { method: 'none', message: 'Sign-in has not been set up for this server yet.' };
@@ -464,7 +600,7 @@ export async function signInOptions(db) {
   const users = await db.all(`SELECT id, name, email, role, isSetup FROM appUser WHERE active = 1
     ORDER BY CASE role WHEN 'superAdmin' THEN 0 WHEN 'admin' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END, isSetup, name`);
   return { method: 'temporary', message: 'Temporary test-mode sign-in: pick a user. No password.',
-    users: users.map((u) => ({ ...u, isSetup: Boolean(u.isSetup) })) };
+    users: users.map((u) => ({ ...u, isSetup: Boolean(u.isSetup) })), google: googleOption() };
 }
 
 /**
@@ -474,21 +610,22 @@ export async function signInOptions(db) {
  *   const user = await identify(db, req.body, req.ip);   // POST /api/auth/sign-in
  *
  * Takes:
- *   body    - { setupCode } signs in as the setup account (any mode; see above).
- *             Temporary: test mode accepts { userId } with no proof.
- *   address - the caller's IP, for the wrong-code limit
+ *   body    - { googleCredential } signs in with Google (any mode; see googleSignIn).
+ *             { setupCode } signs in as the setup account (any mode; see above).
+ *             Test mode only: { userId } with no proof.
+ *   address - the caller's IP, for the failed-sign-in limits
  *
  * Returns:
- *   The user row. Throws { status, error }: the setup code's 401/429, 501 outside test mode
- *   without a code (no sign-in method yet), 400 for no such active user.
+ *   The user row. Throws { status, error }: googleSignIn's 401/403/429/501, the setup code's
+ *   401/429, 501 outside test mode for any other body, 400 for no such active user.
  *
  * When editing:
- *   TEMPORARY. The real method would verify a Google ID token here and look the user up by
- *   email; the setup account has no Google identity and keeps using the setup code.
  *   The { userId } branch must stay test-mode only: it trusts the caller completely.
  */
 export async function identify(db, body, address) {
+  if (body && 'googleCredential' in body) return googleSignIn(db, body.googleCredential, address);
   if (body && 'setupCode' in body) return setupCodeSignIn(db, body.setupCode, address);
+  // Trusts the caller completely: test mode only
   if (!temporarySignIn()) throw { status: 501, error: 'Sign-in has not been set up for this server yet' };
   const userId = Number(body?.userId);
   const user = Number.isInteger(userId) ? await db.get('SELECT * FROM appUser WHERE id = ? AND active = 1', [userId]) : null;

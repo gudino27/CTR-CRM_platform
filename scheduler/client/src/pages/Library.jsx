@@ -1,6 +1,7 @@
 /**
  * Library page: per platform, the Library posts waiting for a slot, everything already
- * placed (Library posts in slots and Specific Date posts), and failed sends.
+ * placed (Library posts in slots and Specific Date posts), failed sends, and sends n8n never
+ * confirmed as published.
  *
  * What lives here:
  *   oldestFirst  sort for the waiting list (the order they fill slots)
@@ -55,22 +56,23 @@ function bySchedule(a, b) {
  *   The page section. Errors show as one red line at the top.
  *
  * How it works:
- *   1. load() fetches platforms, queued posts, failed posts and the app time zone
- *      together. Every change reloads afterwards (run()), because a change can refill
+ *   1. load() fetches platforms, queued posts, failed posts, unconfirmed posts and the
+ *      app time zone together. Every change reloads afterwards (run()), because a change can refill
  *      slots on the server.
  *   2. Waiting = Library posts with no slot, oldest first. Scheduled = Specific Date posts
  *      and Library posts in a slot, by time.
  *   3. Buttons someone may not use are left out rather than refused: Edit needs
  *      editPosts, Remove needs deletePosts (the server checks too). Edit on a scheduled
  *      post (in a slot, or a Specific Date post) also needs editScheduledPosts; without it
- *      the card says "Ask a super admin to change a scheduled post".
+ *      the card says "Ask a super admin or a manager to change a scheduled post".
  *   4. Editing (editForm) can change caption, image, alt text, post type, color and when
  *      to post. Moving a Library post to Specific Date starts from its slot's date and
  *      time. A 409 shows the collision notice with "Use <time>" and "Schedule anyway".
- *   5. Paused platforms say so: their queued posts have no time, and Specific Date posts
- *      whose time passes during the pause move to "Failed to send".
- *   6. Requeue: a Library post goes back to the library; a Specific Date post needs a new
+ *   5. Requeue: a Library post goes back to the library; a Specific Date post needs a new
  *      date and time first.
+ *   6. "Not confirmed" lists posts n8n accepted but never confirmed as published (only with
+ *      N8N_CONFIRMS_POSTS=true on the server), with "Mark as published" and "Requeue". Both
+ *      need editScheduledPosts too, since the post may already be live.
  *
  * When editing:
  *   PATCH /api/posts/:id and POST /api/posts/:id/requeue (server/src/routes/posts.js)
@@ -84,10 +86,13 @@ export default function Library() {
   const canEdit = Boolean(permissions.editPosts);
   const canDelete = Boolean(permissions.deletePosts);
   // A scheduled post (in a slot, or Specific Date) also needs editScheduledPosts, like isScheduled in server/src/routes/posts.js
+  // Unconfirmed posts may already be live: marking or requeueing them needs editScheduledPosts as well
+  const canConfirm = canEdit && Boolean(permissions.editScheduledPosts);
   const canEditPost = (post) => canEdit && (Boolean(permissions.editScheduledPosts) || !(post.kind === "fixed" || post.slotId != null));
   const [platforms, setPlatforms] = useState([]);
   const [posts, setPosts] = useState([]);
   const [failedPosts, setFailedPosts] = useState([]);
+  const [unconfirmedPosts, setUnconfirmedPosts] = useState([]); // sent, n8n never confirmed (N8N_CONFIRMS_POSTS)
   const [timezone, setTimezone] = useState();
   const [editing, setEditing] = useState(null); // { id, kind, caption, altText, image, postTypeId, color, date, time }
   const [conflict, setConflict] = useState(null);
@@ -110,6 +115,7 @@ export default function Library() {
    * Fetches everything the page shows. Throws on any API error (callers show it).
    */
   async function load() {
+    const unconfirmed = api.unconfirmedPosts();
     const [allPlatforms, queuedPosts, failed, status] = await Promise.all([
       api.platforms(),
       api.posts({ status: "queued" }),
@@ -120,6 +126,7 @@ export default function Library() {
     setPosts(queuedPosts);
     setFailedPosts(failed);
     setTimezone(status.timezone);
+    setUnconfirmedPosts(await unconfirmed);
   }
 
   useEffect(() => {
@@ -509,12 +516,117 @@ export default function Library() {
                 Edit
               </button>
             )}
-            {canEdit && !canEditPost(post) && <span className="field-hint">Ask a super admin to change a scheduled post.</span>}
+            {canEdit && !canEditPost(post) && <span className="field-hint">Ask a super admin or a manager to change a scheduled post.</span>}
             {canDelete && (
               <button type="button" className="remove-button" onClick={() => removePost(post)}>
                 Remove
               </button>
             )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * Marks a sent but unconfirmed post as published (POST /api/posts/:id/confirm), after
+   * someone checked it is on the platform.
+   *
+   * Takes:
+   *   post - the posted post row with confirmedAt null
+   */
+  function markPublished(post) {
+    run(() => api.confirmPost(post.id));
+  }
+
+  /**
+   * The New Date / New Time fields for requeueing a Specific Date post, with the viewer's-time
+   * hint. Used by the "Not confirmed" cards; the values live in requeueing like the failed
+   * cards' do, so requeuePost sends them.
+   *
+   * Takes:
+   *   post - the post row
+   */
+  function requeueDateFields(post) {
+    const picking = requeueing?.id === post.id;
+    return (
+      <>
+        <div className="date-time-row">
+          <div>
+            <label htmlFor={`requeueDate-${post.id}`}>New Date</label>
+            <input
+              id={`requeueDate-${post.id}`}
+              type="date"
+              value={picking ? requeueing.date : ""}
+              onChange={(event) => setRequeueing({ time: "", ...(picking ? requeueing : {}), id: post.id, date: event.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor={`requeueTime-${post.id}`}>New Time ({zoneCity(timezone)})</label>
+            <input
+              id={`requeueTime-${post.id}`}
+              type="time"
+              value={picking ? requeueing.time : ""}
+              onChange={(event) => setRequeueing({ date: "", ...(picking ? requeueing : {}), id: post.id, time: event.target.value })}
+            />
+          </div>
+        </div>
+        {picking && <YourTimeHint date={requeueing.date} time={requeueing.time} timeZone={timezone} />}
+      </>
+    );
+  }
+
+  /**
+   * One post's card in "Not confirmed": a post n8n accepted but never confirmed as published
+   * (only with N8N_CONFIRMS_POSTS=true on the server). Shows when it was sent, with
+   * "Mark as published" and "Requeue" for people with editPosts and editScheduledPosts.
+   *
+   * Takes:
+   *   post     - the posted post row with confirmedAt null
+   *   platform - its platform
+   *
+   * When editing:
+   *   Requeue uses the same flow as failed posts (requeuePost): a Specific Date post needs a
+   *   new date and time; a Library post goes back to the library. A post that was in fact
+   *   published is published again, so the card says to check the platform first.
+   */
+  function unconfirmedCard(post, platform) {
+    const fixed = post.kind === "fixed";
+    const picking = requeueing?.id === post.id;
+
+    return (
+      <div key={post.id} className="library-post library-post-unconfirmed">
+        <div className="badge-row">
+          {fixed ? <span className="badge badge-fixed">Specific Date</span> : <TypeBadge name={post.postTypeName} />}
+          {!fixed && <ColorBadge color={post.color} />}
+          <span className="badge">Not confirmed</span>
+        </div>
+
+        <p className="library-caption">{post.caption}</p>
+        <p>
+          Sent {post.sentAt ? formatDateTime(post.sentAt, timezone) : "at an unknown time"}
+          {post.scheduledAt ? ` for ${formatDateTime(post.scheduledAt, timezone)}` : ""}, but n8n never confirmed it
+          was published.{" "}
+          {canConfirm
+            ? `Check ${platform.name}: if the post is there, mark it as published; if not, requeue it (requeueing a post that did go out publishes it twice).`
+            : "Someone who can edit posts can mark it as published or requeue it."}
+        </p>
+
+        {fixed && canConfirm && requeueDateFields(post)}
+
+        {canConfirm && (
+          <div className="post-actions">
+            <button type="button" onClick={() => markPublished(post)}>
+              Mark as published
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => requeuePost(post)}
+              disabled={fixed && !(picking && requeueing.date && requeueing.time)}
+            >
+              Requeue
+            </button>
           </div>
         )}
       </div>
@@ -612,20 +724,11 @@ export default function Library() {
         const waiting = platformPosts.filter((post) => post.kind === "library" && !post.slotId).sort(oldestFirst);
         const scheduled = platformPosts.filter((post) => post.kind === "fixed" || post.slotId).sort(bySchedule);
         const failed = failedPosts.filter((post) => post.platformId === platform.id);
+        const unconfirmed = unconfirmedPosts.filter((post) => post.platformId === platform.id);
 
         return (
           <div key={platform.id} className="library-platform">
-            <h2>
-              {platform.name}
-              {platform.paused ? " (paused)" : ""}
-            </h2>
-            {platform.paused && (
-              <p className="field-hint" role="note">
-                Posting is paused for {platform.name}: its queued posts have no time and nothing is sent until it is
-                resumed on the Platforms page. Specific Date posts whose time passes during the pause move to
-                "Failed to send", to be requeued with a new date.
-              </p>
-            )}
+            <h2>{platform.name}</h2>
 
             <h3>Waiting in library ({waiting.length})</h3>
             {waiting.length === 0 ? (
@@ -645,6 +748,13 @@ export default function Library() {
               <>
                 <h3 className="error-text">Failed to send ({failed.length})</h3>
                 <div className="library-list">{failed.map(failedCard)}</div>
+              </>
+            )}
+
+            {unconfirmed.length > 0 && (
+              <>
+                <h3>Not confirmed ({unconfirmed.length})</h3>
+                <div className="library-list">{unconfirmed.map((post) => unconfirmedCard(post, platform))}</div>
               </>
             )}
           </div>

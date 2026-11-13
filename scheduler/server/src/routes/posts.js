@@ -1,6 +1,7 @@
 /**
  * Post routes (/api/posts): the Library's lists, Compose's create and edit, requeueing a failed
- * post, n8n's status callback, a post's send history, and delete.
+ * (or sent but unconfirmed) post, marking a sent post as published, n8n's status callback, a
+ * post's send history, and delete.
  *
  * Two kinds of post: a library post (kind "library", a post type and, on platforms that use
  * colors, Blue or Purple; no date) waits for the next matching empty slot; a Specific Date post
@@ -8,7 +9,7 @@
  * syncPlatform (services/sync.js) places posts in slots and writes the calendar after every change.
  *
  * Permissions (ROUTES in services/permissions.js, which also writes the audit entries):
- * GET needs any signed-in user; POST createPosts; PATCH and requeue editPosts; DELETE deletePosts;
+ * GET needs any signed-in user; POST createPosts; PATCH, requeue and confirm editPosts; DELETE deletePosts;
  * the status callback is open to n8n (with N8N_CALLBACK_SECRET when set) and needs editPosts
  * from a signed-in person. PATCH on a scheduled post (isScheduled) also needs editScheduledPosts,
  * checked here.
@@ -22,6 +23,7 @@ import { localDateTimeString, parseLocalDateTime } from '../services/time.js';
 import { parsePlatform, removeCalendarEvent, syncPlatform } from '../services/sync.js';
 import { SELECT_POST } from '../services/views.js';
 import { collisionMs } from '../settings.js';
+import { resolveNotConfirmed } from '../services/notifications.js';
 
 const STATUSES = ['queued', 'sending', 'posted', 'failed'];
 const KINDS = ['library', 'fixed'];
@@ -246,10 +248,12 @@ export function postsRouter(db) {
    *   kind       - optional, "library" or "fixed"
    *   placed     - optional "true" (in a slot, or fixed: a fixed post always has its date) or
    *                "false" (a library post not in a slot)
+   *   confirmed  - optional "false" (not yet confirmed as published, confirmedAt NULL; with
+   *                status=posted this is the Library's "Not confirmed" list) or "true"
    *
    * Returns:
    *   200 [post] ordered by platform, then scheduled time (unplaced last), then created;
-   *   400 for a bad status, kind or placed.
+   *   400 for a bad status, kind, placed or confirmed.
    *
    * When editing:
    *   Archived posts (the Archive page) are left out of these lists.
@@ -262,12 +266,16 @@ export function postsRouter(db) {
     }
     if (kind && !KINDS.includes(kind)) return res.status(400).json({ error: 'kind must be "library" or "fixed"' });
     if (placed && placed !== 'true' && placed !== 'false') return res.status(400).json({ error: 'placed must be true or false' });
+    const { confirmed } = req.query;
+    if (confirmed && confirmed !== 'true' && confirmed !== 'false') return res.status(400).json({ error: 'confirmed must be true or false' });
+    const confirmedSql = { true: 'AND post.confirmedAt IS NOT NULL', false: 'AND post.confirmedAt IS NULL' };
     const placedSql = { true: "AND (slot.id IS NOT NULL OR post.kind = 'fixed')", false: "AND slot.id IS NULL AND post.kind = 'library'" };
     const sql = `${SELECT_POST} WHERE post.status IN (${statuses.map(() => '?').join(', ')})
                  AND post.archivedAt IS NULL
                  ${platformId ? 'AND post.platformId = ?' : ''}
                  ${kind ? 'AND post.kind = ?' : ''}
                  ${placed ? placedSql[placed] : ''}
+                 ${confirmed ? confirmedSql[confirmed] : ''}
                  ORDER BY post.platformId, post.scheduledAt IS NULL, post.scheduledAt, post.createdAt, post.id`;
     res.json(await db.all(sql, [...statuses, ...(platformId ? [platformId] : []), ...(kind ? [kind] : [])]));
   });
@@ -327,7 +335,7 @@ export function postsRouter(db) {
    *
    * Returns:
    *   200 with the post; 404 unknown; 403 { error, permission } for a scheduled post without
-   *   editScheduledPosts ("Ask a super admin to change a scheduled post"); 409 when it is no
+   *   editScheduledPosts ("Ask a super admin or a manager to change a scheduled post"); 409 when it is no
    *   longer queued, or a time clash
    *   ({ error, conflict, suggestedAt }); 400 with a message for invalid input or an unusable
    *   platform.
@@ -347,7 +355,7 @@ export function postsRouter(db) {
     if (post.status !== 'queued') return res.status(409).json({ error: `Post is ${post.status} and can no longer be edited` });
     // Second permission check: ROUTES only checked editPosts
     if (isScheduled(post) && !(await can(db, req.user, 'editScheduledPosts'))) {
-      return res.status(403).json({ error: 'Ask a super admin to change a scheduled post', permission: 'editScheduledPosts' });
+      return res.status(403).json({ error: 'Ask a super admin or a manager to change a scheduled post', permission: 'editScheduledPosts' });
     }
     const body = req.body ?? {};
     const moving = 'platformId' in body && body.platformId !== post.platformId;
@@ -384,6 +392,8 @@ export function postsRouter(db) {
   /**
    * POST /api/posts/:id/requeue: puts a failed post back in line. A failed library post goes
    * back to the library; a failed Specific Date post needs a new date and time. Needs editPosts.
+   * A post sent but never confirmed as published (posted, confirmedAt NULL) can be requeued the
+   * same way, for when it did not appear on the platform.
    *
    * Usage:
    *   POST /api/posts/12/requeue                                  (library post)
@@ -394,17 +404,25 @@ export function postsRouter(db) {
    *   body.force   - true to requeue despite a time clash
    *
    * Returns:
-   *   200 with the post (queued again, lastError cleared); 404 when it is not a failed post;
-   *   400 for a missing or past fixedAt; 409 { error, conflict, suggestedAt } for a time clash.
+   *   200 with the post (queued again, lastError and confirmedAt cleared); 404 when it is not
+   *   a failed or unconfirmed post; 400 for a missing or past fixedAt; 409 { error, conflict,
+   *   suggestedAt } for a time clash.
    *
    * When editing:
-   *   The slot it missed stays empty; the post waits for the next matching one.
+   *   The slot it missed stays empty; the post waits for the next matching one. Requeueing an
+   *   unconfirmed post closes its notConfirmed notification; if it was in fact published, it
+   *   will be published again.
    */
   router.post('/:id/requeue', async (req, res) => {
     const post = await postById(req.params.id);
-    if (!post || post.status !== 'failed') return res.status(404).json({ error: 'Failed post not found' });
+    const unconfirmed = post?.status === 'posted' && post.confirmedAt == null;
+    if (!post || (post.status !== 'failed' && !unconfirmed)) return res.status(404).json({ error: 'Failed post not found' });
+    // An unconfirmed post may already be live, so requeueing it could publish it twice: scheduled-post editors only
+    if (unconfirmed && !(await can(db, req.user, 'editScheduledPosts'))) {
+      return res.status(403).json({ error: 'Ask a super admin or a manager to requeue a post that was sent', permission: 'editScheduledPosts' });
+    }
     const { fixedAt, force } = req.body ?? {};
-    const updates = [['status', 'queued'], ['lastError', null], ['scheduledAt', null]];
+    const updates = [['status', 'queued'], ['lastError', null], ['scheduledAt', null], ['confirmedAt', null]];
 
     if (post.kind === 'fixed') {
       const at = parseLocalDateTime(fixedAt, config.timezone);
@@ -418,7 +436,37 @@ export function postsRouter(db) {
     }
     await freeSlotOf(post.id);
     await update(post.id, updates);
+    await resolveNotConfirmed(db, post.id);
     await syncPlatform(db, post.platformId);
+    res.json(await postById(post.id));
+  });
+
+  /**
+   * POST /api/posts/:id/confirm: "Mark as published" on the Library page, for a post that was
+   * sent but that n8n never confirmed, after someone checked it is on the platform. Needs
+   * editPosts; ROUTES writes the audit entry (post.confirm).
+   *
+   * Usage:
+   *   POST /api/posts/12/confirm
+   *
+   * Returns:
+   *   200 with the post (confirmedAt set to now); 404 unknown; 409 when it is not a sent post
+   *   waiting for confirmation (not posted, or already confirmed).
+   *
+   * When editing:
+   *   Closes the post's notConfirmed notification right away.
+   */
+  router.post('/:id/confirm', async (req, res) => {
+    const post = await postById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    if (post.status !== 'posted' || post.confirmedAt != null) {
+      return res.status(409).json({ error: post.status === 'posted' ? 'Post is already confirmed' : `Post is ${post.status}, not waiting for a confirmation` });
+    }
+    if (!(await can(db, req.user, 'editScheduledPosts'))) {
+      return res.status(403).json({ error: 'Ask a super admin or a manager to mark a post as published', permission: 'editScheduledPosts' });
+    }
+    await update(post.id, [['confirmedAt', clock.now().toISOString()]]);
+    await resolveNotConfirmed(db, post.id);
     res.json(await postById(post.id));
   });
 
@@ -439,6 +487,11 @@ export function postsRouter(db) {
    * Returns:
    *   200 with the post; 404 unknown; 400 for a bad status; 409 when the post was never sent
    *   (only sending, posted or failed posts take a callback).
+   *
+   * How it works:
+   *   "posted" also confirms the post (confirmedAt, kept if already set), which is what
+   *   N8N_CONFIRMS_POSTS=true waits for; "failed" clears it, so the post lists under
+   *   "Failed to send" and gets a postFailed notification.
    */
   router.post('/:id/status', async (req, res) => {
     const post = await postById(req.params.id);
@@ -449,7 +502,9 @@ export function postsRouter(db) {
       return res.status(409).json({ error: `Post is ${post.status}; only sent posts take a status callback` });
     }
     await update(post.id, [['status', status], ['platformPostId', platformPostId],
-      ['lastError', status === 'failed' ? (error ?? 'n8n reported a failure') : null]]);
+      ['lastError', status === 'failed' ? (error ?? 'n8n reported a failure') : null],
+      ['confirmedAt', status === 'posted' ? (post.confirmedAt ?? clock.now().toISOString()) : null]]);
+    await resolveNotConfirmed(db, post.id);
     res.json(await postById(post.id));
   });
 

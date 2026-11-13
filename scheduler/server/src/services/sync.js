@@ -60,16 +60,16 @@ export function setCalendarClient(client) {
  *   const platform = parsePlatform(row);
  *
  * Returns:
- *   The row with enabled, isTest, paused and usesColors as booleans. The old postingDays and
+ *   The row with enabled, isTest and usesColors as booleans. The old postingDays and
  *   postingTimes columns are left out: schedule rules replaced them (views.js cadenceOf gives
- *   that shape where pages still want it).
+ *   that shape where pages still want it). The unused paused column is left out too: turning a
+ *   platform off (enabled) is the way to stop its posting.
  */
-export function parsePlatform({ postingDays, postingTimes, ...row }) {
+export function parsePlatform({ postingDays, postingTimes, paused, ...row }) {
   return {
     ...row,
     enabled: Boolean(row.enabled),
     isTest: Boolean(row.isTest),
-    paused: Boolean(row.paused),
     usesColors: Boolean(row.usesColors),
   };
 }
@@ -253,7 +253,7 @@ async function writeBlueprint(db, platform, months, nowIso, regenerate) {
  *   db         - the database (a transaction)
  *   platform   - parsed platform
  *   nowIso     - now as an ISO string
- *   scheduling - false when the platform schedules nothing (off, paused, or the Test platform
+ *   scheduling - false when the platform schedules nothing (off, or the Test platform
  *                outside test mode): posts are released but no slot is filled
  *
  * Returns:
@@ -262,10 +262,9 @@ async function writeBlueprint(db, platform, months, nowIso, regenerate) {
  * How it works:
  *   1. For each slot holding a queued post (sent or failed posts stay in their slot as history):
  *      - a due slot (time passed): the post is the dispatcher's. It is released only if it
- *        doesn't belong (not this platform's library post), or it wasn't due (paused, or edited
- *        after its slot), since then it missed it. While not scheduling (paused or off), a
- *        missed post stays in its passed slot until the platform schedules again, so the
- *        resume can list it (views.js missedPosts); then it is released and refills.
+ *        doesn't belong (not this platform's library post), or it wasn't due (the platform was
+ *        off, or it was edited after its slot), since then it missed it; it goes back to the
+ *        library and refills the next matching slot once the platform schedules.
  *      - a future slot: released if the post doesn't belong, or the slot is not locked and
  *        either its day has a Specific Date post, or (when not pinned) it is a blackout day or
  *        the post no longer fits it (type or color).
@@ -294,9 +293,8 @@ async function placePosts(db, platform, nowIso, scheduling) {
     const belongs = post.kind === 'library' && post.platformId === platform.id;
     let release;
     if (slot.scheduledAt <= nowIso) {
-      // A due post is the dispatcher's; one that wasn't due missed it. While not
-      // scheduling it stays in its passed slot, so resuming can list it as missed
-      release = !belongs || (scheduling && (post.scheduledAt === null || post.scheduledAt > nowIso));
+      // A due post is the dispatcher's; one that wasn't due missed it
+      release = !belongs || post.scheduledAt === null || post.scheduledAt > nowIso;
     } else {
       release = !belongs || (!slot.locked && (blocked.has(slot.date)
         || (!slot.pinned && (blackedOut(slot) || !fitsSlot(slot, post, platform.usesColors)))));
@@ -324,7 +322,7 @@ async function placePosts(db, platform, nowIso, scheduling) {
  * The sync itself (syncPlatform queues it). Run only inside the shared queue.
  *
  * How it works:
- *   1. Decides whether the platform schedules: disabled or paused platforms, and the Test
+ *   1. Decides whether the platform schedules: disabled platforms, and the Test
  *      platform outside test mode, schedule nothing. Their queued posts lose their time and
  *      calendar event, so the dispatcher sends none of them. Slots and their assignments are
  *      kept, so turning them back on restores the schedule (with new calendar events); a post
@@ -334,10 +332,10 @@ async function placePosts(db, platform, nowIso, scheduling) {
  *      requested months, placePosts, then works out each queued post's time. Posts whose time
  *      has come are the dispatcher's and are left out (rescheduling them would push them to a
  *      later slot), except while not scheduling: then posts already due but not sent yet are
- *      included too, so pausing stops them. Fixed posts go at fixedAt, library posts at their
+ *      included too, so turning a platform off stops them. Fixed posts go at fixedAt, library posts at their
  *      slot; unplaced ones have no time.
- *      A Specific Date post with no time whose date passed was held back by a pause (or the
- *      platform being off). Sending it late could be wrong (a holiday post), so it fails for a
+ *      A Specific Date post with no time whose date passed was held back by the platform being
+ *      off. Sending it late could be wrong (a holiday post), so it fails for a
  *      person to requeue.
  *      Every post's scheduledAt is saved here, first, so the app shows it even if the
  *      calendar is unreachable.
@@ -359,13 +357,13 @@ async function syncPlatformNow(db, platformId, { months = [], regenerate = false
   const row = await db.get('SELECT * FROM platform WHERE id = ?', [platformId]);
   if (!row) return;
   const platform = parsePlatform(row);
-  const scheduling = platform.enabled && !platform.paused && (config.testMode || !platform.isTest);
+  const scheduling = platform.enabled && (config.testMode || !platform.isTest);
   const schedule = await db.transaction(async (tx) => {
     await writeBlueprint(tx, platform, [...monthsFrom(now, syncMonthsAhead, config.timezone), ...months], nowIso, regenerate);
     const slots = await placePosts(tx, platform, nowIso, scheduling);
     const slotTime = new Map(slots.filter((s) => s.postId).map((s) => [s.postId, s.scheduledAt]));
 
-    // Due posts are the dispatcher's, except while not scheduling (pausing stops them too)
+    // Due posts are the dispatcher's, except while not scheduling (turning off stops them too)
     const posts = await tx.all(`SELECT post.*, postType.name AS postTypeName FROM post LEFT JOIN postType ON postType.id = post.postTypeId
                                 WHERE post.platformId = ? AND post.status = 'queued'
                                   AND (post.scheduledAt IS NULL OR post.scheduledAt > ? OR ? = 0)`, [platformId, nowIso, scheduling ? 1 : 0]);
@@ -379,7 +377,7 @@ async function syncPlatformNow(db, platformId, { months = [], regenerate = false
       // Held back past its date: fail it rather than send it late
       if (post.kind === 'fixed' && post.scheduledAt === null && at && at <= nowIso) {
         await tx.run(`UPDATE post SET status = 'failed', lastError = ?, updatedAt = datetime('now') WHERE id = ?`,
-          [`Not sent: ${platform.name} was paused or turned off at ${post.fixedAt.replace('T', ' ')}. Requeue it with a new date.`, post.id]);
+          [`Not sent: ${platform.name} was turned off at ${post.fixedAt.replace('T', ' ')}. Requeue it with a new date.`, post.id]);
         placed.push({ post, slot: null });
         continue;
       }

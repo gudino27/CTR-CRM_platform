@@ -56,7 +56,7 @@ export function usersRouter(db) {
   const otherActiveSuperAdmins = async (id) =>
     (await db.get("SELECT COUNT(*) AS n FROM appUser WHERE role = 'superAdmin' AND active = 1 AND isSetup = 0 AND id != ?", [id])).n;
 
-  // ---- Sign-in (TEMPORARY method plus the setup code; see services/auth.js) ----
+  // ---- Sign-in (Google, the setup code, and test mode's list; see services/auth.js) ----
 
   /**
    * GET /api/auth/options: what the sign-in screen offers. No sign-in needed.
@@ -105,16 +105,19 @@ export function usersRouter(db) {
    * POST /api/auth/sign-in: signs someone in and starts a session cookie. No sign-in needed.
    *
    * Usage:
+   *   POST /api/auth/sign-in  { googleCredential: "<Google ID token>" }
    *   POST /api/auth/sign-in  { setupCode: "ABCD..." }   or, in test mode only, { userId: 3 }
    *
    * Takes:
-   *   body - checked by identify (services/auth.js), which also applies the setup code's
-   *          wrong-code limit per IP address
+   *   body - checked by identify (services/auth.js), which also applies the failed-sign-in
+   *          limits per IP address (Google sign-ins and setup codes counted separately)
    *
    * Returns:
    *   200 { user, permissions, session }; the status and error identify throws otherwise
-   *   (400 no such active user, 501 no sign-in method on this server, or a wrong, expired or
-   *   rate-limited setup code).
+   *   (400 no such active user; 401 a Google token Google does not confirm, or a wrong,
+   *   expired or used setup code; 403 a Google account that may not sign in (not an active
+   *   user, outside the Workspace domain, unverified email); 429 too many failures;
+   *   501 that sign-in method is not set up on this server).
    *
    * When editing:
    *   Always start a new session id and revoke the one this browser had (if any), so an old

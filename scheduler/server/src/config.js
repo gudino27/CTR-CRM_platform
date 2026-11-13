@@ -9,8 +9,8 @@
  *
  * When editing:
  *   A new variable also goes in .env.example and the README's "Server settings (.env)" list (the
- *   delivered zip does not include .env.example). MEDIA_TRASH_DAYS and ARCHIVE_AFTER_MONTHS are read
- *   in services/mediaTrash.js and services/archive.js, not here.
+ *   delivered zip does not include .env.example). MEDIA_TRASH_DAYS, ARCHIVE_AFTER_MONTHS and N8N_CONFIRMS_POSTS are
+ *   read in services/mediaTrash.js, services/archive.js and services/dispatch.js, not here.
  */
 import { randomBytes } from 'node:crypto';
 
@@ -50,6 +50,10 @@ const testMode = env.TEST_MODE !== 'false';
  *                    default 8); see services/auth.js
  *   n8nCallbackSecret N8N_CALLBACK_SECRET: when set, n8n's status callback must send it in the
  *                    X-Callback-Secret header
+ *   googleSignIn     "Sign in with Google": clientId is GOOGLE_SIGNIN_CLIENT_ID (an OAuth Web client;
+ *                    null turns Google sign-in off), domain is GOOGLE_WORKSPACE_DOMAIN in lower case
+ *                    (when set, only accounts of that Google Workspace may sign in; null allows any
+ *                    verified Google account whose email is on the user list); see services/auth.js
  *   selfCallSecret   made fresh at every start: the dispatcher sends it to the built-in test endpoint
  *                    so BASIC_AUTH lets the app's own call through (nobody outside the process knows it)
  *
@@ -93,6 +97,10 @@ export const config = {
     maxHours: positive(env.SESSION_MAX_HOURS, 8),
   },
   n8nCallbackSecret: env.N8N_CALLBACK_SECRET || null,
+  googleSignIn: {
+    clientId: env.GOOGLE_SIGNIN_CLIENT_ID || null,
+    domain: env.GOOGLE_WORKSPACE_DOMAIN?.trim().toLowerCase() || null,
+  },
   selfCallSecret: randomBytes(32).toString('hex'),
 };
 
