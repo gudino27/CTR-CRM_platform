@@ -1,18 +1,19 @@
 # CTR Social Scheduler — Test Log
 
 **Project:** Conversations to Remember (CTR) Social Scheduler  
-**Testing Date:** November 9, 2026  
-**Testing Type:** Automated Unit and Integration Testing  
+**Automated Test Execution:** November 9, 2026  
+**Manual Observation / Review:** November 16–17, 2026  
+**Testing Type:** Automated Backend Unit/Integration and Manual Frontend/Deployment Review  
 **Testing Framework:** Node.js Built-in Test Runner (`node --test`)  
-**Test Environment:** Local Development Environment  
-**Tested Component:** Social Scheduler Backend  
-**Test Status:** In Progress
+**Test Environment:** Local Development and Cloudflare Test Deployment  
+**Tested Components:** Social Scheduler Backend and Selected Frontend Workflows  
+**Test Status:** Historical backend suite complete; live integration / client verification open
 
 ---
 
 ## 1. Testing Overview
 
-This document records the automated testing performed on the CTR Social Scheduler application.
+This document records the historical backend automated test run and separately documented frontend/manual results and integration limitations.
 
 The purpose of testing is to verify that the backend functions correctly, handles invalid inputs, maintains data integrity, and supports the expected scheduling and post management operations.
 
@@ -58,7 +59,7 @@ The command executes the server test suite through the project's configured npm 
 | Skipped | 0 |
 | **Automated Test Pass Rate** | **100% (107/107)** |
 
-On November 9, 2026, the CTR Social Scheduler completed 107 automated unit and integration tests. All tests passed, with no failures, skipped tests, or pending automated tests. Testing covered scheduling, authentication, database operations, webhook publishing, Google Calendar synchronization, media management, notifications, and activity logging. External integrations were tested using controlled mocks. Final manual and acceptance testing remains pending.
+On November 9, 2026, the CTR Social Scheduler completed 107 automated unit and integration tests. All tests passed, with no failures, skipped tests, or pending automated tests. Testing covered scheduling, authentication, database operations, webhook publishing, Google Calendar synchronization, media management, notifications, and activity logging. External integrations were tested using controlled mocks. The project tester additionally reported 15 earlier frontend passes. Final external integration and client acceptance tests remain outstanding.
 
 ## 4. Detailed Test Results
 
@@ -370,125 +371,129 @@ The complete automated backend test suite was executed using `npm test`.
 | Skipped | 0 |
 | TODO | 0 |
 
-The results confirm that all implemented automated tests passed together without failures.
+The November 9 results confirm that all 107 automated tests in that recorded run passed. These tests were not rerun during the November 17 documentation review.
 
-Manual frontend testing, live external service verification, and client acceptance testing remain separate activities.
+Previously reported manual frontend tests are documented separately; live external service verification and client acceptance are still distinct.
 
 
 
-## 7. Remaining Testing Activities
+## 7. Frontend and External Verification Status
 
-All 107 automated backend tests passed during the final regression test on November 9, 2026.
+### 7.1 Recorded Results Summary
 
-The following table distinguishes completed automated verification from testing that still requires manual or live-system validation.
+| Group | Pass | Partial | Blocked | Pending | Total |
+|---|---:|---:|---:|---:|---:|
+| Automated backend tests (TC-001–090, TC-112–128) | 107 | 0 | 0 | 0 | 107 |
+| Previously reported frontend tests (TC-091–105) | 15 | 0 | 0 | 0 | 15 |
+| External and client acceptance tests (TC-106–111) | 0 | 3 | 2 | 1 | 6 |
+| New final-release regression (TC-129–137) | 0 | 0 | 4 | 5 | 9 |
+| **Documented total** | **122** | **3** | **6** | **6** | **137** |
 
-| Testing Area | Current Verification | Status |
+**Scope notes:**
+- The 107 automated Pass values are from the **November 9, 2026** run, not a newly executed November 17 run.
+- The 15 frontend Pass values were previously confirmed by the project tester; no per-case timestamps or comprehensive screenshot set was supplied. TC-102 is a historical Pass for a feature the client later removed from the required UI.
+- **Partial** means that the directly observed portion passed but the overall case cannot yet be declared Pass.
+- **Blocked** is an access/configuration dependency; it is not a confirmed application failure.
+- The nine TC-129–137 cases are newly planned regression tests; **none is claimed as executed**.
+
+### 7.2 Manual Browser Observations — November 16, 2026
+
+| Area | Action / Recorded Actual Result | Observation |
 |---|---|---|
-| Backend functionality | 107 automated tests passed | Completed |
-| Authentication and permissions | Session management and role-based access tested | Automated Tests Passed |
-| Scheduling functionality | Recurring schedules, rotations, blackouts, and exceptions tested | Automated Tests Passed |
-| Image management | Upload, duplicate detection, deletion, and restoration tested | Partially Verified |
-| Google Calendar integration | Event creation, updates, deletion, and two-way sync tested with mocks | Live Verification Pending |
-| Google Drive integration | Real file upload and retrieval not yet verified | Pending |
-| n8n integration | Webhook publishing and callbacks tested with local mocks | Live Verification Pending |
-| Frontend functionality | Compose, Library, Calendar, Media, and settings require recorded manual verification | Pending |
-| End-to-end testing | Complete workflow across deployed services requires verification | Pending |
-| Client acceptance testing | Final client review and approval required | Pending |
-| Regression testing | Complete automated backend suite passed | Automated Testing Completed |
+| Post scheduling | Created a Facebook Specific Date post with caption `Testing`, JPEG media, scheduled for **November 20, 2026 at 1:00 PM ET**. After retry, the interface confirmed scheduling. | **Passed in app** |
+| Scheduler Calendar | November calendar showed the `Testing` fixed-date post at 1:00 PM and indicated the ordinary slot was displaced/skipped. | **Passed in app** |
+| Google Calendar | Tester did not open the Google test calendar; its identity/access was not available. | **Not verified** |
+| Media library | Media page showed `IMG_5705.jpeg`, preview, file details, platform checks, and an association with the Facebook post. | **Passed in app** |
+| Google Drive direct file link | Selecting **Open the image** led to Google's **You need access** page for the signed-in Google account. | **Access blocked**; must confirm intended sharing |
+| Team Member restrictions | Direct navigation to `/users`, `/permissions`, `/activity` and `/archive` displayed **Not available**. | **Passed page-level checks** |
+| Admin restrictions | Demo Admin opened the Users page and could see appropriate controls; `/permissions` returned **Not available**. | **Passed selected page-level checks** |
+| Full Workspace login | Test-mode account picker was used; production Google Workspace login and 2-step protections were not exercised. | **Not verified** |
+| n8n workflow | Tester does not have access to n8n execution history. | **Blocked** |
 
-### 7.1 Remaining Priorities
+**Incident observed:** Scheduling initially displayed `The image did not upload. Choose another one.` Jaime subsequently reported an expired Google token, and scheduling worked on retry. The precise failure cause and refresh behavior were not independently logged or reproduced.
 
-The remaining testing priorities are:
+### 7.3 External/Acceptance Case Disposition
 
-1. Verify frontend workflows through manual testing.
-2. Test Google Calendar, Google Drive, and n8n using approved test environments.
-3. Verify the complete workflow from post creation through publishing confirmation.
-4. Record client acceptance results.
-5. Repeat regression testing if application changes are introduced.
+| ID | Result | Remaining Evidence / Owner |
+|---|---|---|
+| TC-106 | **Partial** | Jaime: verify Google test calendar has the Nov 20 Facebook event at 1:00 PM ET and that its details match |
+| TC-107 | **Blocked** | Jaime/client: confirm test upload stored in the expected Drive folder and that approved staff can open file links |
+| TC-108 | **Blocked** | Jaime: show n8n execution and correct post payload and callback status |
+| TC-109 | **Partial** | Jaime: complete Google event → test dispatch → callback with consistent post state |
+| TC-110 | **Partial** | Jaime/client: verify Workspace sign-in with 2-step and allowed account list; check API authorization and remaining roles |
+| TC-111 | **Pending** | Robert and Ilana: final requirement review and written acceptance or exceptions |
 
-These activities are separate from the completed automated backend tests.
+### 7.4 Newly Added Regression Cases
 
-**Current Status:** Automated backend testing completed successfully. Final system verification and client acceptance remain pending.
+| IDs | Focus | Status |
+|---|---|---|
+| TC-129 | Production Google Workspace sign-in | Blocked |
+| TC-130 | Manager vs Team Member content and user permissions | Pending |
+| TC-131 | LinkedIn every-other-week pattern across year boundary | Pending |
+| TC-132 | Holiday color rotation and displaced normal slot | Pending |
+| TC-133 | n8n confirmations, failed posts, retries, unconfirmed alerts | Blocked |
+| TC-134 | Drive permissions and Super Admin media restoration | Blocked |
+| TC-135 | Archive behavior and historical Google Calendar retention | Pending |
+| TC-136 | TEST_MODE/DRY_RUN destination and live-publishing isolation | Blocked |
+| TC-137 | Inventory, notification, audit, archive and Calendar regression | Pending |
 
+### 7.5 Jaime / Client Verification List (From Latest Client Follow-up)
 
+| Outstanding Item | Needed From | Tracking |
+|---|---|---|
+| Confirm the app's Google test calendar, sync and OAuth token handling | Jaime | TC-106 |
+| Confirm Google Drive folder, sharing roles, and Super Admin media restore | Jaime / client | TC-107, TC-134 |
+| Verify n8n after-post callback for `posted` and `failed`, protected by callback secret | Jaime / client n8n maintainer | TC-108, TC-109, TC-133 |
+| Configure client Workspace OAuth credentials, authorized accounts and initial Super Admin emails | Client with Jaime | TC-110, TC-129 |
+| Choose subdomain / reverse-proxy route and complete client-hosted deployment | Client with Jaime | Deployment handoff |
+| Decide whether old published posts archive automatically or by staff action | Client | TC-135 |
+| Confirm past Google Calendar events remain part of historical record | Client | TC-135 |
+| Capture final client approval and deployment limitations | Client | TC-111 |
+
+**Do not treat this checklist as proof of completion.** The email describes intended implementation and unresolved questions, not signed test evidence.
+
+---
 
 ## 8. Test Evidence
 
-Automated testing was performed on November 9, 2026, using the Node.js built-in test runner.
+### 8.1 Historical Automated Evidence
 
-**Test Execution Command:**
+The **November 9, 2026** backend execution recorded 107 passed, 0 failed, 0 skipped and 0 TODO.
 
 ```bash
 cd scheduler
 npm test
 ```
 
-### 8.1 Final Automated Test Results
+Files currently present under `testing/evidence/`:
 
-| Result | Count |
-|---|---:|
-| Total Tests | 107 |
-| Passed | 107 |
-| Failed | 0 |
-| Skipped | 0 |
-| TODO | 0 |
-| Pass Rate | 100% |
-
-All 107 automated tests passed successfully.
-
-### 8.2 Test Execution Screenshots
-
-**Evidence Directory:** `testing/evidence/`
-
-| Evidence File | Description |
+| File | Record |
 |---|---|
-| `final_test_results_1.png` | Automated test execution output |
-| `final_test_results_2.png` | Final summary showing 107 passed and 0 failed |
+| `final_test_results_1.png` | Automated run screenshot |
+| `final_test_results_2.png` | Automated summary screenshot |
 
-The screenshots provide supporting evidence of the completed automated regression test.
+These screenshots **are already present in the reviewed GitHub tree**. Retain them. A fresh run on the final code has not yet been provided.
 
-**Evidence Status:** Screenshots captured; repository upload pending.
+### 8.2 Manual Evidence to Add
 
-### 8.3 Testing Environment
+Copy appropriate screenshots from the November 16 test session into `testing/evidence/` if permitted. Suggested descriptive names: `compose_specific_date.png`, `calendar_fixed_post.png`, `media_details.png`, `drive_access_blocked.png`, `team_member_denied.png`, and `admin_users.png`. **These names are suggestions only; do not cite them as files already committed.**
 
-- Operating System: macOS
-- Testing Framework: Node.js Built-in Test Runner
-- Backend: Node.js and Express.js
-- Database: SQLite
-- Integration Testing: Local APIs and mocked external services
+### 8.3 Limits of Current Verification
 
-Testing was performed without modifying the client's production data or external services.
+- Unit tests and mocked integration tests are not proof of live third-party behavior.
+- Visible pages denying access do not replace server-side/API penetration or authorization testing.
+- Screenshot-only functional evidence cannot validate persistence after restart or Google Drive ACLs.
+- Client's Workspace setup and final acceptance are outside the tester's current access.
+- The reported expired Google token was corrected for the observed flow; reliable automated refresh under different failure conditions remains to be confirmed.
 
-### 8.4 Verification Limitations
-
-The automated results confirm that all implemented tests passed. They do not independently verify live Google Calendar, Google Drive, n8n, frontend workflows, or final client acceptance.
-
-
+---
 
 ## 9. Testing Conclusion
 
-Automated backend testing for the CTR Social Scheduler was completed on November 9, 2026.
+The Social Scheduler has **107 recorded automated test passes** from November 9 and **15 previously reported manual frontend passes**. Focused November 16 browser testing confirmed fixed-date scheduling within the app, media display, and selected page-level role restrictions. **No failures were recorded for completed tests.**
 
-A total of 107 automated unit and integration tests were executed using the Node.js built-in test runner. All 107 tests passed, with zero failures, skipped tests, or pending automated tests.
+Three original external/acceptance cases are Partial, two are Blocked and one Pending. Nine additional current-release regression cases were added and have not yet been executed.
 
-The testing covered:
+**Total documented inventory:** **137 cases — 122 recorded historical/reported Pass, 3 Partial, 6 Blocked, 6 Pending**.
 
-- Date and time calculations
-- Recurring scheduling and post rotation
-- Authentication and role-based access control
-- Post creation, editing, and management
-- Webhook publishing and failure handling
-- Google Calendar synchronization
-- Image upload, deletion, and restoration
-- Notifications and activity logging
-- Database integrity and API validation
-
-Integration testing used isolated databases, local API endpoints, and mock external services to protect production data.
-
-The results demonstrate that the tested backend functionality meets the expected behavior for the scenarios covered by the automated test suite.
-
-However, successful automated testing does not establish complete system readiness. Manual frontend testing, live external integration verification, end-to-end testing, and client acceptance remain necessary.
-
-**Overall Testing Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed.
-
-**Remaining Work:** Final System Verification and Client Acceptance Testing.
+**Current release conclusion:** Internal testing documentation is updated. A fresh backend regression run, external integration verification, Google Workspace setup, client deployment decisions and formal acceptance remain outstanding. Do not represent the product as fully accepted or production verified.

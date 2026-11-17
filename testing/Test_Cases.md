@@ -3,9 +3,10 @@
 **Project:** Conversations to Remember (CTR) Social Scheduler  
 **Document Type:** Software Test Cases  
 **Prepared Date:** November 9, 2026  
+**Last Reviewed:** November 17, 2026  
 **Testing Framework:** Node.js Built-in Test Runner  
 **Testing Environment:** Local Development and Test Environments  
-**Document Status:** In Progress
+**Document Status:** Reviewed; external verification remains open
 
 ---
 
@@ -38,7 +39,9 @@ Testing is divided into four categories:
 | Fail | Test executed and did not meet expected results |
 | TODO | Automated test is defined but not yet implemented |
 | Pending | Test is planned but formal execution has not been recorded |
-| Blocked | Test cannot proceed because of missing functionality, access, or decisions |
+| Blocked | Unable to complete because of missing access, configuration, or client decisions |
+| Partial | Some steps passed but the full test is not yet verified |
+| Retired | No longer part of the client's current required workflow; retain historical results |
 
 ---
 
@@ -268,8 +271,8 @@ Testing is divided into four categories:
 | TC-115 | Test session expiration, logout, and revocation | Invalid or expired sessions denied access | Pass |
 | TC-116 | Generate schedules using biweekly posting rules | Correct biweekly posting dates produced | Pass |
 | TC-117 | Add blackout dates to existing posting schedules | Regular scheduled posts excluded from blackout dates | Pass |
-| TC-118 | Pause and resume platform scheduling | Scheduling stops and resumes correctly | Pass |
-| TC-119 | Advance the clock during a pause and resolve missed posts | Return to library, reschedule, and skip choices applied correctly | Pass |
+| TC-118 | Pause and resume platform scheduling (legacy backend coverage) | Backend pause/resume logic works; the client removed pause from the required UI | Pass |
+| TC-119 | Advance the clock during a pause and resolve missed posts (legacy backend coverage) | Historical missed-post handling passes; pause is no longer a required UI control | Pass |
 | TC-120 | Lock or pin calendar slots, then modify schedule rules | Locked and pinned slots remain unchanged | Pass |
 | TC-121 | Dispatch a due post to a successful mock webhook twice | Post published once and dispatch history recorded | Pass |
 | TC-122 | Dispatch a post to a mock webhook returning HTTP 503 | Post marked failed and no automatic duplicate retry occurs | Pass |
@@ -288,123 +291,103 @@ Testing is divided into four categories:
 
 ## 4. Frontend Functional Test Cases
 
-**Test Type:** Manual Functional Testing  
-**Environment:** Local CTR Social Scheduler Web Application
+**Type:** Manual functional testing  
+**Environment:** CTR Social Scheduler web test deployment
 
-The frontend has been reported as functioning correctly during development review. The following cases document the formal verification steps and evidence needed for the final testing record.
+The project tester previously confirmed **15 manual frontend passes (TC-091–TC-105)**. Their historical outcomes are preserved. The November 16 browser checks documented below verify a subset of current behavior; they do not establish that every latest change or integration was retested.
 
-They are marked Pending until their individual outcomes are recorded in `Test_Log.md`.
+### 4.1 Historical Frontend Cases
 
-### 4.1 Frontend Test Cases
-
-| Test ID | Test Procedure | Expected Result | Status |
+| ID | Test Procedure | Expected Result | Recorded Status |
 |---|---|---|---|
-| TC-091 | Open the application and navigate between all available pages | Pages load and navigation works without errors | Pass |
-| TC-092 | Open Compose and submit a post with required fields missing | Form displays validation messages and prevents submission | Pass |
-| TC-093 | Complete required fields and submit a valid post | Post is saved and appears in the appropriate library or schedule | Pass |
-| TC-094 | Upload a supported image and preview it | Image loads correctly and displays its preview | Pass |
-| TC-095 | Upload an unsupported or oversized image | Application displays the appropriate warning or validation result | Pass |
-| TC-096 | Rotate or replace an image before publishing | Media changes are reflected correctly in the application | Pass |
-| TC-097 | Open Library and view available posts | Saved posts display with their associated details | Pass |
-| TC-098 | Create a Specific Date post and view the Calendar | Post appears on its selected date and time | Pass |
-| TC-099 | Edit an eligible scheduled post | Allowed changes save and display correctly | Pass |
-| TC-100 | Switch between available Calendar views and navigate between dates | Correct posts and dates are displayed | Pass |
-| TC-101 | Update a platform's posting days or times | Updated settings are saved and applied according to the selected behavior | Pass |
-| TC-102 | Pause and resume a platform | Scheduling behavior matches the finalized requirements | Pass |
-| TC-103 | Delete an eligible image and test restoration | Deletion and restoration follow retention and permission rules | Pass |
-| TC-104 | Sign in using each supported role and attempt restricted operations | Only authorized functions are available and enforced | Pass |
-| TC-105 | Inspect activity history and session expiration | Relevant user actions are recorded and session limits behave correctly | Pass |
+| TC-091 | Open the application and navigate between available pages | Available pages open without errors | Pass (reported) |
+| TC-092 | Submit Compose without required fields | Missing fields block submission | Pass (reported) |
+| TC-093 | Create a valid post | Post saved to Library or Calendar | Pass (reported) |
+| TC-094 | Upload a supported image and preview it | Correct image appears | Pass (reported) |
+| TC-095 | Try an unsupported or oversized image | A suitable warning is shown | Pass (reported) |
+| TC-096 | Rotate or replace an image before publishing | Updated media appears | Pass (reported) |
+| TC-097 | Open Library and inspect saved posts | Posts and details display correctly | Pass (reported) |
+| TC-098 | Schedule a Specific Date post and inspect Calendar | Post appears on chosen date and time | Pass (reported; browser check observed) |
+| TC-099 | Edit an eligible scheduled post | Allowed changes persist | Pass (reported) |
+| TC-100 | Navigate Calendar dates/views | Display matches selected period | Pass (reported; old wording needs current-build regression) |
+| TC-101 | Update platform posting days/times | Settings save and affect eligible slots | Pass (reported) |
+| TC-102 | Pause and resume platform through the older UI | Earlier requirement was met | Pass (historical; **retired from current UI acceptance**) |
+| TC-103 | Delete eligible media and restore it | Retention and permissions enforced | Pass (reported) |
+| TC-104 | Use different roles and attempt restricted actions | Unauthorized actions unavailable | Pass (reported; partial browser checks observed) |
+| TC-105 | Inspect activity history and sessions | History and session handling behave correctly | Pass (reported) |
 
-**Results:** 15 manual test cases awaiting formal result documentation.
+**Historical frontend total:** 15 passed, 0 failed. One of the 15 (TC-102) is no longer a current client-facing requirement. New final-release requirements are listed separately in Section 5.1.
 
-### 4.2 Manual Test Recording
+### 4.2 Guided Browser Check Results — November 16, 2026
 
-Each manual test should record:
-
-- Execution date.
-- Tested application version or Git commit.
-- User role, where applicable.
-- Expected behavior.
-- Actual behavior.
-- Pass, Fail, or Blocked status.
-- Screenshot or defect reference.
-
-For example:
-
-**Test ID:** TC-092  
-**Feature:** Compose Form Validation  
-**Precondition:** Compose page accessible.
-
-**Procedure:**
-
-1. Open the Compose page.
-2. Leave the required caption field empty.
-3. Complete other required fields.
-4. Attempt to submit the post.
-
-**Expected Result:** Submission is prevented and the required caption validation message is displayed.
-
-**Actual Result:** To be recorded during formal execution.
-
-**Status:** Pending.
-
----
-
-## 5. End-to-End and External Integration Test Cases
-
-**Test Type:** Integration, End-to-End, and User Acceptance Testing
-
-These tests require designated test services, appropriate configuration, or client participation.
-
-| Test ID | Test Procedure | Expected Result | Status |
-|---|---|---|---|
-| TC-106 | Schedule a post and inspect the designated Google test calendar | Matching event is created with correct details | Pending |
-| TC-107 | Upload test media and inspect the designated Google Drive folder | File is uploaded and accessible through the expected link | Pending |
-| TC-108 | Trigger a publishing request through the designated n8n test workflow | Correct payload is received and processing result is reported | Pending |
-| TC-109 | Complete the workflow from Compose through scheduling, test dispatch, and callback | Data remains consistent across all involved components | Pending |
-| TC-110 | Verify finalized authentication and permission rules through the deployed test environment | Unauthorized actions are blocked and authorized actions succeed | Pending |
-| TC-111 | Conduct client acceptance review using final agreed requirements | Client verifies core workflows and outstanding issues are documented | Pending |
-
-**Results:** 6 planned test cases.
-
-These tests must not be executed against live publishing workflows or production content without explicit authorization.
-
----
-
-
-## 6. Client Requirement Test Traceability
-
-The following table maps client requirements to their corresponding test cases and verification results.
-
-| Client Requirement | Related Test Cases | Verification Status |
+| Action | Observed Result | Evidence/Limit |
 |---|---|---|
-| Correct recurring posting days and times | TC-014, TC-017, TC-101, TC-116 | Automated backend verified; manual UI testing pending |
-| Consistent Blue/Purple color rotation | TC-015, TC-016, TC-021 | Automated tests passed |
-| Holiday posts shift subsequent color rotation | TC-021, TC-098 | Automated tests passed; manual verification pending |
-| Changing posting days offers schedule choices | TC-022, TC-101 | Automated tests passed; manual verification pending |
-| Changing slot post types supports rotation choices | TC-023 | Automated tests passed |
-| Configurable posting times | TC-017, TC-101 | Backend verified; manual UI testing pending |
-| Specific Date posts and scheduling conflicts | TC-086, TC-087, TC-098 | Backend verified; manual testing pending |
-| Restrict editing of published posts | TC-085, TC-112, TC-114 | Backend restrictions verified |
-| Rename employee role to Team Member | TC-104 | Manual verification pending |
-| Restrict Team Member editing permissions | TC-104, TC-110, TC-112–114 | Automated permission testing passed; UI verification pending |
-| Super Admin media restoration permissions | TC-103, TC-110, TC-126 | Media restoration tested; role-specific verification pending |
-| Blackout date behavior | TC-117 | Automated tests passed |
-| Biweekly posting across year boundaries | TC-116 | Automated tests passed |
-| Locked and pinned calendar slots | TC-120 | Automated tests passed |
-| Pause, resume, and missed posts | TC-118, TC-119 | Automated tests passed |
-| Google Calendar synchronization | TC-046–052, TC-106, TC-124, TC-125 | Automated mock testing passed; live integration pending |
-| Google Drive media storage | TC-107, TC-126 | Local media testing passed; live Drive testing pending |
-| n8n publishing and callback | TC-059–068, TC-089, TC-108, TC-121–123, TC-127 | Automated webhook testing passed; live n8n verification pending |
-| Authentication and access control | TC-053–058, TC-104, TC-110, TC-112–115 | Automated security tests passed |
-| Notifications and activity logging | TC-128 | Automated tests passed |
+| Compose a Facebook Specific Date post with caption `Testing` and an image, November 20, 2026, 1:00 PM ET | Post saved after the Google token issue was addressed | Scheduler screenshot; not proof of live publishing |
+| View Scheduler Calendar for November 2026 | Facebook Specific Date post appears at 1:00 PM; regular slot is displaced | In-app Calendar only; Google Calendar itself not inspected |
+| Open Media page | Uploaded JPEG preview, dimensions, platform checks and associated Facebook post appear | Does not verify Drive file sharing |
+| Open media's Google Drive link | Google Drive asks the tester to request access | Approved staff access needs confirmation |
+| Demo Team Member: open `/users`, `/permissions`, `/activity`, `/archive` directly | Each page displays `Not available` | Confirms page-level restrictions, not all API permissions |
+| Demo Admin: open `/users` and `/permissions` | Users page opens; Permissions page denies access | Super Admin and Workspace SSO still need final deployed checks |
 
-The automated backend test suite completed 107 tests with 107 passes and zero failures.
+**Observed integration issue:** A Google token was reported as expired during initial scheduling; the test post later saved. Token refresh handling needs Jaime's confirmation.
 
-Automated test success confirms the expected behavior of the tested components. Live external integrations, frontend workflows, and client acceptance require separate verification.
+### 4.3 Manual Test Evidence Standard
+
+For a manually executed case, record date, Git commit/build, role, steps, expected and actual results, status, and screenshot or log reference. Screenshots shared during a conversation are **not automatically present** in `testing/evidence/`.
 
 ---
 
+## 5. External Integration and Acceptance Cases
+
+The following six tests are **not all passed**. A working interface or a teammate's assumption cannot replace the external verification.
+
+| ID | Procedure | Expected Result | Nov 17 Status |
+|---|---|---|---|
+| TC-106 | Schedule a post and inspect the designated **Google test calendar** | Correct Google event with matching date, time, platform and caption | **Partial** — in-app post and schedule verified; Google Calendar not checked |
+| TC-107 | Upload or reuse media; check **authorized Google Drive access** | File stored and readable by approved staff | **Blocked** — media preview works; the tester's Google account requests access |
+| TC-108 | Execute the approved **n8n test workflow** | Correct webhook payload, execution and callback | **Blocked** — n8n controlled by Jaime |
+| TC-109 | Run Compose → Schedule → Google event → test dispatch → callback | Consistent post/status across services | **Partial** — Compose/Calendar passed; remaining external flow not verified |
+| TC-110 | Verify user roles, API permissions and production Google Workspace sign-in | Access limited to authorized users; restricted API calls denied | **Partial** — Team Member/Admin page checks passed; live SSO and broader API checks outstanding |
+| TC-111 | Client reviews final workflows, limitations and deployment | Client signs off or records issues | **Pending** — final acceptance not provided |
+
+**External/acceptance group:** 0 fully passed, 3 Partial, 2 Blocked, 1 Pending.
+
+### 5.1 Additional Final-Release Regression Cases
+
+These cases cover newer functionality from the repo and the latest client follow-up. **No execution result is claimed.**
+
+| ID | Test Procedure | Expected Result | Status |
+|---|---|---|---|
+| TC-129 | Attempt Google Workspace sign-in with approved, unlisted and outside accounts | Workspace authorization plus app user list are enforced; two-step protection applies | Blocked — client Workspace setup |
+| TC-130 | Manager and Team Member edit scheduled posts, schedules, media, users | Manager can manage content/schedules, not users; Team Member cannot edit scheduled posts | Pending |
+| TC-131 | Verify LinkedIn's alternating weeks, including year change | Mon/Wed/Fri alternates with Tue/Thu across week boundaries | Pending |
+| TC-132 | Insert a holiday post into Blue/Purple schedule; inspect later slots | Holiday uses correct color; later colors shift; displaced library post stays available | Pending |
+| TC-133 | In n8n, verify posted/failed callback, retry and an unconfirmed post alert | Status, notifications, failures and requeue work correctly | Blocked — Jaime/n8n |
+| TC-134 | Inspect Drive image through approved staff accounts; attempt media restore under each role | Approved staff can open; only Super Admin restores from Recently Deleted | Blocked — Drive account permissions |
+| TC-135 | Inspect Archive and a past published event in Google Calendar | Archive follows final client policy; historical Calendar events remain available | Pending — client policy |
+| TC-136 | Inspect `TEST_MODE`, `DRY_RUN`, test calendar and webhook destinations | Test execution cannot publish to live social accounts | Blocked — Jaime's server configuration |
+| TC-137 | Recheck Inventory, Notifications, Activity, Archive, roles, month navigation on final version | Current pages function for authorized roles; unauthorized pages stay blocked | Pending |
+
+---
+
+## 6. Client Requirement Traceability
+
+| Requirement | Tests | Verification |
+|---|---|---|
+| Required caption + image; optional alt text; hashtags in caption | TC-092–095, TC-129–137 as appropriate | Earlier frontend passed; current form visible; recent changes need final regression |
+| Typed Library / Specific Date and slot displacement | TC-019–023, TC-093, TC-098, TC-132 | Historical backend passes and Nov 16 calendar check |
+| Alternating Blue/Purple / holiday posts | TC-015–016, TC-021, TC-132 | Automated passed historically; deployed holiday regression pending |
+| Changing schedule days or post types, keeping/moving posts | TC-022–023, TC-101 | Automated and earlier manual passes reported |
+| LinkedIn every-other-week schedule | TC-116, TC-131 | Backend test passed historically; final setting verification pending |
+| Team Member/Manager/Super Admin privileges | TC-104, TC-110, TC-112–115, TC-130 | Backend historical passes; partial direct-route checks observed |
+| Image restoration and Google Drive permissions | TC-103, TC-107, TC-126, TC-134 | Local/mocked tests passed; Drive access blocked for tester |
+| Blackout and locked/pinned slots | TC-117, TC-120 | Historical automated passes |
+| Pause UI | TC-102, TC-118–119 | Legacy tests retained; client removed pause from requested UI |
+| Google Calendar event sync | TC-046–052, TC-106, TC-124–125 | Automated mock tests passed; actual calendar check outstanding |
+| n8n callbacks and notifications | TC-059–068, TC-108–109, TC-121–123, TC-127–128, TC-133 | Automated local/mock tests passed; real n8n outstanding |
+| Workspace sign-in and 2-step protection | TC-110, TC-129 | Client account/access setup outstanding |
+| Archiving and historical Calendar events | TC-135 | Client decision outstanding |
+| Client acceptance | TC-111 | Pending |
 
 ---
 
@@ -412,145 +395,70 @@ Automated test success confirms the expected behavior of the tested components. 
 
 ### 7.1 Automated Tests
 
-All automated server tests are located under:
-
-```text
-scheduler/server/test/
-├── unit/
-│   ├── time.test.js
-│   ├── projection.test.js
-│   ├── imageRules.test.js
-│   ├── imageInfo.test.js
-│   ├── googleCalendar.test.js
-│   ├── googleAuth.test.js
-│   └── dispatch.test.js
-└── integration/
-    ├── db.test.js
-    ├── posts.test.js
-    └── postOperations.test.js
-```
-
-From the `scheduler/` directory, run:
+There are **27 JavaScript automated test files** under `scheduler/server/test/` (8 unit and 19 integration). Run from the `scheduler/` directory:
 
 ```bash
+npm ci
 npm test
 ```
 
-The test runner automatically discovers and executes the test files.
+The command runs the Node.js built-in test runner through the server workspace. Use a supported Node.js release. Record commit, date, run output, and any failures. The **last documented run** was November 9, 2026; this review did not execute a new run.
 
-### 7.2 Manual Tests
+### 7.2 Manual / Integration Tests
 
-Frontend tests are executed by interacting with the application through a browser.
+Use designated demo/test accounts. Verify the environment is in Test Mode and is not connected to live publishing before issuing dispatch tests. Record both application behavior and the external service result. If an account or service is unavailable, use **Blocked**, not Pass.
 
-Test results should be recorded individually in the test log, with screenshots when useful.
+### 7.3 Final Regression
 
-### 7.3 Regression Tests
-
-After the final application changes are merged:
-
-1. Record the tested Git commit.
-2. Rerun the complete automated test suite.
-3. Repeat critical frontend workflows.
-4. Verify client-requested scheduling changes.
-5. Complete applicable external integration tests.
-6. Update the test log and defect records.
+After Jaime's latest changes are merged, rerun `npm test`, check critical current UI workflows, then execute the applicable TC-129–TC-137 cases. Do not retest the retired pause UI as a current client requirement.
 
 ---
 
+## 8. Results and Inventory
 
-## 8. Test Results Summary
+### 8.1 Recorded Automated Result — November 9, 2026
 
-### 8.1 Completed Automated Testing
+| Test Category | Passed | Failed |
+|---|---:|---:|
+| Date and Time | 10 | 0 |
+| Scheduling and Rotation | 13 | 0 |
+| Image Validation | 11 | 0 |
+| Image Metadata | 11 | 0 |
+| Google Calendar Event Formatting | 7 | 0 |
+| Google Authentication Setup | 6 | 0 |
+| Post Dispatching | 10 | 0 |
+| Database Operations | 5 | 0 |
+| Post API Validation | 8 | 0 |
+| Post Management Operations | 9 | 0 |
+| Additional Security and Integration | 17 | 0 |
+| **Total** | **107** | **0** |
 
-**Execution Date:** November 9, 2026
+**Historical automated pass rate:** 100% (107/107). This result was not rerun during the present review.
 
-| Test Category | Passed | Failed | TODO |
-|---|---:|---:|---:|
-| Date and Time | 10 | 0 | 0 |
-| Scheduling and Rotation | 13 | 0 | 0 |
-| Image Validation | 11 | 0 | 0 |
-| Image Metadata | 11 | 0 | 0 |
-| Google Calendar Event Formatting | 7 | 0 | 0 |
-| Google Authentication Setup | 6 | 0 | 0 |
-| Post Dispatching | 10 | 0 | 0 |
-| Database Operations | 5 | 0 | 0 |
-| Post API Validation | 8 | 0 | 0 |
-| Post Management Operations | 9 | 0 | 0 |
-| Additional Security and Integration Testing | 17 | 0 | 0 |
-| **Total** | **107** | **0** | **0** |
+### 8.2 Complete Test Case Inventory — As Documented November 17
 
-**Automated Test Execution Pass Rate: 100% (107/107).**
+| Group | Pass | Partial | Blocked | Pending | Total |
+|---|---:|---:|---:|---:|---:|
+| Automated TC-001–090 and TC-112–128 | 107 | 0 | 0 | 0 | 107 |
+| Prior manual frontend TC-091–105 | 15 | 0 | 0 | 0 | 15 |
+| External/acceptance TC-106–111 | 0 | 3 | 2 | 1 | 6 |
+| New regression TC-129–137 | 0 | 0 | 4 | 5 | 9 |
+| **Total** | **122** | **3** | **6** | **6** | **137** |
 
-All automated tests passed successfully.
-
-### 8.2 Additional Planned Testing
-
-| Category | Planned Cases | Recorded Results |
-|---|---:|---|
-| Manual Frontend Testing | 15 | Pending |
-| External Integration and Acceptance Testing | 6 | Pending |
-| **Total** | **21** | **Pending** |
-
-Manual frontend testing, live external integration testing, and client acceptance testing remain separate from the completed automated backend tests.
-
-### 8.3 Complete Test Case Inventory
-
-| Status | Count |
-|---|---:|
-| Automated tests passed | 107 |
-| Automated tests failed | 0 |
-| Automated TODO tests | 0 |
-| Additional planned tests | 21 |
-| **Total documented test cases** | **128** |
-
-Automated testing covers TC-001 through TC-090 and TC-112 through TC-128.
-
-TC-091 through TC-111 remain planned for manual frontend, external integration, and acceptance testing.
-
-The automated test suite passed all 107 tests. Final system verification and client acceptance testing remain pending.
+The 15 manual passes are tester-reported historical results; one (TC-102) refers to a retired UI feature. A total of **15 cases have not been fully verified**. No additional passes are inferred from Jaime's client email.
 
 ---
 
+## 9. Completion Criteria
+
+Final release testing is complete only when critical automated tests pass on the final commit, current client requirements have recorded results, high-severity issues are resolved or accepted, external integrations have explicit verification, Google Workspace account restrictions are checked, and client acceptance is documented. Unfinished cases may be recorded as limitations but should not be mislabeled Pass.
 
 ---
-
-## 9. Test Completion Criteria
-
-Testing will be considered complete when:
-
-1. All critical automated tests pass on the final application version.
-2. Outstanding client-requested features have been tested or documented as limitations.
-3. Core frontend workflows have recorded test results.
-4. High-severity defects have been resolved or formally accepted.
-5. Required Google Calendar, Google Drive, and n8n integrations have been verified in approved environments.
-6. Final regression testing is completed.
-7. Client acceptance results are documented.
-8. Test evidence and results are available in the project repository.
-
 
 ## 10. Conclusion
 
-The CTR Social Scheduler completed automated backend testing on November 9, 2026.
+The repository contains **107 automated test cases** with a recorded November 9 result of **107 passed**. The project tester reported **15 earlier frontend passes**. Guided browser checks additionally confirmed fixed-date scheduling within the Scheduler, media display, and selected role-based page restrictions.
 
-A total of 107 automated unit and integration tests were executed using the Node.js built-in test runner. All 107 tests passed, with zero failures, skipped tests, or pending automated tests.
+Google Calendar was not checked outside the app, direct Google Drive access was denied to the tester's account, n8n execution history was unavailable, and Google Workspace sign-in/client acceptance remain outstanding. Nine current-release regression tests were added to track these and other updated requirements.
 
-The completed tests verified:
-
-- Scheduling and post rotation
-- Authentication and role-based access control
-- Post creation, editing, and management
-- Webhook publishing and failure handling
-- Google Calendar synchronization using mock services
-- Image upload, deletion, and restoration
-- Notifications and activity logging
-- Database operations and API validation
-
-The automated testing achieved a 100% pass rate for the implemented test cases.
-
-An additional 21 test cases remain planned for manual frontend testing, live external integration verification, and client acceptance testing.
-
-The results demonstrate that the tested backend components behave as expected. However, final system readiness requires successful completion of the remaining verification activities.
-
-**Overall Testing Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed.
-
-**Remaining Work:** Manual Frontend Testing, Live Integration Verification, and Client Acceptance Testing.
+**Documented status:** 137 test cases; 122 historical/reported Pass; 3 Partial; 6 Blocked; 6 Pending. Final integration verification and client handoff remain open.

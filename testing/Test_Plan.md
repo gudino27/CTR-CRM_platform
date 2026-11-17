@@ -3,9 +3,10 @@
 **Project:** Conversations to Remember (CTR) Social Scheduler  
 **Document Type:** Software Test Plan  
 **Prepared Date:** November 9, 2026  
+**Last Reviewed:** November 17, 2026  
 **Testing Environment:** Local Development and Test Environments  
 **Testing Framework:** Node.js Built-in Test Runner  
-**Document Status:** In Progress
+**Document Status:** Reviewed — internal results recorded; client-dependent verification open
 
 ---
 
@@ -65,19 +66,24 @@ Backend testing covers the following components:
 
 ### 3.2 Frontend Functionality
 
-Frontend testing will verify the application's main user-facing features.
+Frontend testing covers current user-facing features. Previously reported cases TC-091–TC-105 were marked Pass by the project tester. The newer final-release scenarios TC-129–TC-137 remain planned or blocked.
 
-| Feature | Planned Testing |
+| Feature | Testing Scope |
 |---|---|
-| Compose | Create posts, validate required fields, select platforms |
-| Library | View, manage, and organize available posts |
-| Calendar | View schedules, edit posts, and manage posting slots |
-| Media | Upload, preview, rotate, replace, and delete images |
-| Platform Settings | Configure posting schedules, times, and preferences |
-| User Management | Verify accounts, roles, and permissions |
-| Navigation | Verify page navigation and interface behavior |
+| Compose | Required caption and image, optional alt text, library vs fixed-date posts, safe preview |
+| Library | Waiting/scheduled/failed posts, editing, failed-post requeue, post status |
+| Calendar | Monthly view, platforms, empty/fixed/locked slots, type/color rotation, holiday insertion |
+| Inventory | Content coverage by platform, type/color, monthly indicators and near-term gaps |
+| Media | JPEG conversion, upload/preview, rotate, image metadata, deletion, restoration and permissions |
+| Platforms | Weekday/time rules, LinkedIn alternate weeks, post types and Calendar colors |
+| Users | Admin/Manager/Team Member role controls, allowed user management |
+| Permissions | Super Admin access and correct enforcement |
+| Activity | Auditable changes and restricted visibility |
+| Archive | Published-post retention and client-approved archival behavior |
+| Notifications | Failed/not-confirmed post alerts and resolution |
+| Sign-in | Test account picker and production Google Workspace sign-in when configured |
 
-Frontend tests will include normal user workflows, invalid input scenarios, and usability checks.
+**Change in scope:** The client removed the pause function from the required UI. Historical pause tests are retained but not used as current client acceptance criteria. The present Calendar interface is monthly, rather than the earlier Queue/Schedule design.
 
 ### 3.3 External Integrations
 
@@ -97,11 +103,14 @@ The following areas are not fully covered by the initial automated test suite:
 - Actual publishing to Facebook, Instagram, and LinkedIn.
 - Complete Google Workspace integration.
 - Final production deployment and hosting.
-- Complete frontend user workflows.
-- Final authentication and permission enforcement.
-- Client-requested features still under development.
+- Current-release regression for new UI, roles, calendar rotation and inventory.
+- Google Workspace sign-in and two-step protection in the actual client environment.
+- n8n callbacks and confirmation status in the approved workflow.
+- Direct Google Drive file sharing to authorized staff.
+- Google test calendar verification and test/production isolation.
+- Client deployment, archiving policy and final acceptance.
 
-These areas will be tested after the necessary implementation and access become available.
+These areas are tracked as **Partial**, **Blocked**, or **Pending** rather than counted as passed.
 
 ## 4. Testing Strategy and Methodology
 
@@ -324,6 +333,7 @@ Test cases will record:
 | TC-091–105 | Manual Frontend Testing |
 | TC-106–111 | External Integration and Acceptance Testing |
 | TC-112–128 | Additional Security and Integration Testing |
+| TC-129–137 | New Final-Release Functional, Integration and Deployment Regression |
 
 Detailed results are maintained separately in `testing/Test_Log.md`.
 
@@ -333,16 +343,22 @@ Testing will include the requirements clarified through client correspondence.
 
 | Requirement | Verification Needed |
 |---|---|
-| Team Member role | Confirm employee role is renamed appropriately |
-| Post editing permissions | Verify Team Members cannot edit scheduled posts |
-| Holiday color rotation | Verify holiday insertion shifts later color assignments |
-| Posting schedule changes | Verify options to preserve or move scheduled posts |
-| Post type changes | Verify requested choices for adjusting slot rotations |
-| Configurable posting times | Verify each platform's posting times can be changed |
-| Deleted media | Verify restoration permissions and retention behavior |
-| Blackout dates | Verify manually scheduled Specific Date posts retain their schedule |
-| Fixed posting dates | Verify date and time selection for time-sensitive posts |
-| Biweekly scheduling | Verify the final agreed week-number behavior |
+| Team Member role | Test permitted pages and enforce no scheduled-post editing |
+| Manager role | Allow content, images, schedules and settings; deny user management |
+| Super Admin | Verify user/permission management and restore-only media permissions |
+| Google Workspace sign-in | Test client Workspace membership, scheduler user list and two-step protection |
+| Holiday color rotation | Verify holiday insertion shifts subsequent Blue/Purple assignments |
+| Posting schedule changes | Verify preserve/move choice for scheduled posts |
+| Post type changes | Verify single-slot versus continuing rotation choices |
+| Platform time settings | Confirm Facebook/Instagram/LinkedIn cadence and editable times |
+| LinkedIn biweekly recurrence | Verify alternating Mon/Wed/Fri and Tue/Thu including year boundary |
+| Required media | Confirm caption+image required, optional alt text, JPEG conversion |
+| Deleted media | Verify retention and Super Admin restoration |
+| Blackout/fixed dates | Verify Specific Date precedence and blackout handling |
+| Google Calendar | Verify a created event and preservation of past events |
+| n8n callback | Verify posted, failed, unconfirmed, requeue and callback secret |
+| Archive | Confirm retention policy once client decides |
+| Removed pause UI | Verify not presented as a current client requirement |
 
 Requirements without a finalized implementation or decision will remain pending until they can be verified.
 
@@ -474,15 +490,15 @@ The schedule may be adjusted based on remaining development tasks and client ava
 
 | Responsibility | Assigned To |
 |---|---|
-| Develop automated test cases | Testing team member |
-| Execute automated tests | Testing team member |
-| Perform manual functional testing | Project team |
-| Investigate application defects | Development team |
-| Implement application fixes | Development team |
-| Verify resolved defects | Testing team member |
-| Conduct client acceptance review | Client and project team |
-| Prepare testing documentation | Testing team member |
-| Complete final regression testing | Project team |
+| Develop and maintain automated tests | Jaime / project team |
+| Execute automated backend tests | Project team with server access |
+| Perform frontend and role tests | Alice / project team |
+| Verify Google Calendar, Drive, n8n and server configuration | Jaime, with client credentials when required |
+| Investigate and fix software defects | Development team |
+| Verify corrected defects | Project team |
+| Perform client acceptance and approve deployment/archiving | Robert, Ilana and CTR stakeholders |
+| Maintain test plan/cases/log and final report | Alice / project team |
+| Complete final regression on deployed code | Project team |
 
 Testing and development tasks will be coordinated to avoid conflicting changes in the shared repository.
 
@@ -507,76 +523,72 @@ The following testing artifacts will be maintained in the repository:
 | `Test_Plan.md` | Testing strategy, scope, and execution process |
 | `Test_Cases.md` | Detailed test cases and expected results |
 | `Test_Log.md` | Actual test results and execution history |
-| `Bug_Report.md` | Confirmed defects and resolutions |
+| Bug reports or issue tracker entries (when defects are confirmed) | Confirmed defects and resolutions |
 | `evidence/` | Screenshots and supporting test results |
 | Automated test files | Executable backend test cases |
 
 These artifacts will support the Testing section of the final capstone report and provide evidence of the project's verification process.
 
 
-## 16. Current Testing Status
+## 16. Current Testing Status (November 17, 2026)
 
-As of November 9, 2026, automated backend testing for the CTR Social Scheduler has been completed.
+### 16.1 Last Recorded Automated Run
 
-### 16.1 Automated Test Results
+The repository currently contains **27 named JavaScript test files** (8 unit and 19 integration files) with **107 named cases**.
 
-| Status | Count |
+| Automated Result — November 9, 2026 | Count |
 |---|---:|
-| Total Automated Tests | 107 |
+| Total executed | 107 |
 | Passed | 107 |
 | Failed | 0 |
-| Pending (TODO) | 0 |
 | Skipped | 0 |
-| **Automated Test Pass Rate** | **100%** |
+| TODO | 0 |
+| Historical automated pass rate | 100% |
 
-All 107 automated unit and integration tests passed during the final regression test.
+**Important:** The November 17 review inspected the repository, but **did not execute** a new backend run. Do not claim the latest changes are regression-tested until `npm test` is rerun on the final commit.
 
-### 16.2 Completed Testing Areas
+### 16.2 Manual Results and External Limitations
 
-The automated tests verified:
+The project tester previously confirmed **15 Pass** outcomes for TC-091–TC-105. One historical UI test (TC-102, pause) is now retired from current client acceptance.
 
-- Date and time calculations
-- Recurring schedules and post rotation
-- Authentication and role-based permissions
-- Database operations and API validation
-- Post management and scheduling controls
-- Webhook publishing and failure handling
-- Google Calendar synchronization using mock clients
-- Image upload, deletion, and restoration
-- Notifications and activity logging
+Guided browser tests on November 16 observed a successfully saved Facebook Specific Date post and its placement on the Scheduler Calendar, Media preview and post association, Team Member denial of direct access to restricted pages, and Admin access to Users but not Permissions. The Google Drive direct link requested access.
 
-Integration tests used isolated databases, local HTTP endpoints, and mock external services.
+Six original external/acceptance cases (TC-106–TC-111) still require full verification. Nine final-release cases (TC-129–TC-137) cover new client requirements, permissions, Google Workspace sign-in, deployment, callbacks and archiving.
 
-### 16.3 Remaining Testing Activities
+| Documented category | Pass | Partial | Blocked | Pending |
+|---|---:|---:|---:|---:|
+| 107 historical automated cases | 107 | 0 | 0 | 0 |
+| 15 reported frontend cases | 15 | 0 | 0 | 0 |
+| 6 external/acceptance cases | 0 | 3 | 2 | 1 |
+| 9 new final-release cases | 0 | 0 | 4 | 5 |
+| **Total (137)** | **122** | **3** | **6** | **6** |
 
-Although all automated backend tests passed, the following activities remain:
+The 122 recorded passes are **historical/reported**, not proof that every current deployment requirement has passed.
 
-1. Manual frontend functionality testing.
-2. Live Google Calendar and Google Drive integration verification.
-3. Live n8n publishing workflow verification.
-4. End-to-end system testing.
-5. Final client acceptance testing.
+### 16.3 Remaining Verification Before Client Handoff
 
-These activities are necessary to confirm complete system readiness.
+1. Rerun `npm test` and record the final Git commit and console results.
+2. Verify the Facebook test post in the actual Google test calendar, with correct event details.
+3. Confirm Google Drive file access for approved staff, plus Super Admin-only restoration.
+4. Verify n8n webhook payloads, `posted`/`failed` callbacks, unconfirmed alert and retry in an approved test environment.
+5. Complete production Google Workspace sign-in restrictions and role/API checks.
+6. Confirm alternating LinkedIn cadence, holiday rotation and current-page regression cases.
+7. Document the client decision about archiving old published posts; preserve historical Calendar entries.
+8. Confirm final website deployment path (subdomain or proxy route) and secure settings.
+9. Obtain client acceptance or a written list of accepted limitations.
 
-**Overall Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed. Final System Verification Pending.
+Do not run live social-media publishing tests without explicit client authorization.
+
+### 16.4 Test and Production Separation
+
+`TEST_MODE=true` should direct scheduling to `TEST_CALENDAR_ID` and use the test webhook destination. `DRY_RUN=true` should log dispatches without sending. These settings must be confirmed on the running server, not inferred solely from the visible banner. In production, Google Workspace credentials and an authorized domain/user list must be configured. Secrets and tokens must not enter GitHub.
+
+---
 
 ## 17. Conclusion
 
-The CTR Social Scheduler completed automated backend testing on November 9, 2026.
+The CTR Social Scheduler's previously documented automated run passed all **107 backend tests** on November 9, 2026. The project tester reported **15 historical frontend passes**. Focused manual checks on November 16 confirmed fixed-date post scheduling within the web application, media preview and selected role restrictions.
 
-A total of 107 automated unit and integration tests were executed using the Node.js built-in test runner. All 107 tests passed, with zero failures, skipped tests, or pending automated tests.
+The latest review adds nine final-release regression cases and separates completed internal checks from third-party verification. Google Calendar was not inspected outside the app; direct Drive access was denied for the tester's account; n8n execution history and production Google Workspace authentication were unavailable; final client acceptance remains pending.
 
-The testing verified core backend functionality, including scheduling, post management, authentication, role-based permissions, database operations, webhook publishing, Google Calendar synchronization, image management, notifications, and activity logging.
-
-Integration tests used isolated databases, local API endpoints, and mock external services to prevent changes to production data.
-
-The completed automated testing demonstrates that the tested backend components behave according to their expected requirements.
-
-However, successful automated testing does not establish complete system readiness. Manual frontend testing, live external integration verification, end-to-end testing, and client acceptance remain necessary.
-
-The testing results and supporting evidence are documented in Test_Cases.md and Test_Log.md.
-
-**Overall Testing Status:** Automated Backend Testing Completed — 107 Passed, 0 Failed.
-
-**Remaining Work:** Final System Verification and Client Acceptance Testing.
+**Current record:** 137 documented cases, including 122 prior/reported Pass, 3 Partial, 6 Blocked and 6 Pending. The test documentation can be finalized now, but **final release verification cannot be represented as complete** until remaining evidence is collected.
