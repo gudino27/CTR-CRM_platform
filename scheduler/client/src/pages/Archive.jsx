@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useCurrentUser } from '../currentUser.js';
 import { formatStamp } from '../time.js';
+import { thumbnailUrl } from '../components/MediaPicker.jsx';
 // Tabs, notices and the confirm reuse the Media page's styles
 import '../media.css';
 import '../archive.css';
@@ -379,7 +380,7 @@ export default function Archive() {
                   </td>
                   <td>
                     {post.mediaId
-                      ? <img className="archive-thumb" src={`${post.mediaLink}?inline=1`} alt={post.mediaName ?? ''} loading="lazy" />
+                      ? <img className="archive-thumb" src={thumbnailUrl({ id: post.mediaId })} alt={post.mediaName ?? ''} loading="lazy" />
                       : <span className="archive-no-image">None</span>}
                   </td>
                   <td>

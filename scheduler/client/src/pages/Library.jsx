@@ -16,6 +16,7 @@ import {
   ColorBadge, ColorRadios, ConflictNotice, PostTypeSelect, RequiredMark, TypeBadge, colorClass, splitFixedAt,
 } from "../components/PostFields.jsx";
 import ImageField, { imageOfPost, imageProblem } from "../components/ImageField.jsx";
+import { thumbnailUrl } from "../components/MediaPicker.jsx";
 import { PreviewButton } from "../components/PostPreview.jsx";
 import { useCurrentUser } from "../currentUser.js";
 import { BlackoutNotice } from "../components/BlackoutDates.jsx";
@@ -483,7 +484,7 @@ export default function Library() {
 
         {!isEditing && (post.mediaLink ? (
           <p className="library-image">
-            <img src={`${post.mediaLink}?inline=1`} alt="" loading="lazy" />
+            <img src={thumbnailUrl({ id: post.mediaId })} alt="" loading="lazy" />
             <span>
               <strong>Image:</strong>{" "}
               <a href={post.mediaLink} target="_blank" rel="noreferrer">
